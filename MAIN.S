@@ -93,7 +93,7 @@ Sequence:
 		TASK_MAKE	NULL,introLoop,TASK_MAX_DURATION,0
 
 SeqWaitIntro:
-		TASK_MAKE	NULL,initfader12,TASK_MAX_DURATION,0
+        TASK_MAKE   NULL,initfader12,TASK_MAX_DURATION,0
 		TASK_MAKE	NULL,fader,TASK_MAX_DURATION,0
 		TASK_MAKE	NULL,initfader23,TASK_MAX_DURATION,0
 		TASK_MAKE	NULL,fader,TASK_MAX_DURATION,0
@@ -120,6 +120,43 @@ SequenceEnd:
 
 ;------------------------------
 introLoop:
+    ; init sound
+    move.b     #7,$ff8800            ; access Yamaha register 7
+    move.b     #$ff,$ff8802
+    move.w     #1,freq
+    move.w     #7,noise
+    move.w     #0,framecnt
+    move.w     #0,vol
+
+    move.w     freq,d0
+    addq.w     #1,d0
+    and.w      #15,d0
+    move.w     d0,freq
+    add.w      #40000,d0             ; min freq
+    move.b     #0,$ff8800            ; channel A volume
+    move.b     d0,$ff8802            ; freq low
+    move.b     #1,$ff8800            ; channel A volume
+    lsr.w      #8,d0
+    move.b     d0,$ff8802            ; freq hi
+
+    move.b     #11,$ff8800           ; volume over time LOW
+    move.b     #%1100,$ff8802        ; volume over time
+    move.b     #12,$ff8800           ; volume over time HI
+    move.b     #%1,$ff8802           ; volume over time
+
+    move.b     #13,$ff8800           ; envelope
+    move.b     #%1010,$ff8802        ; sine
+
+    move.b     #6,$ff8800            ; NOISE
+    move.b     #100,$ff8802
+
+    move.b     #7,$ff8800            ; access Yamaha register 7
+    move.b     #%11111110,$ff8802    ; turn on channel A, no noise
+
+    move.b     #8,$ff8800            ; channel A volume
+    move.b     #%111,$ff8802         ; channel A volume = 7
+
+
 	lea		SeqWaitIntro,a0
 	bsr		TASK_do
 	TASK_NEXT
@@ -259,6 +296,8 @@ initfader32:
 
 ;---------------------------------------------------------
 fader:
+    bsr         updateSound
+
 	subq.w		#1,faderCounter
 	bmi.s		.endfade
 	move.l		faderCmap,a0
@@ -859,6 +898,42 @@ iapart2:
 
 		rts
 
+updateSound:
+;        move.w     #67,d7
+;updsndLoop:
+;        WAIT_VBL
+
+        ; RAMP UP VOLUME
+        move.w     framecnt,d2
+        addq.w     #1,d2
+        move.w     d2,framecnt
+        lsr.w      #4,d2
+        cmp.w      #15,d2
+        ble.b      noclampvol
+        move.w     #15,d2
+noclampvol:		  
+        move.b     #8,$ff8800            ; channel A volume
+        move.b     d2,$ff8802
+
+
+        move.w     noise,d0
+        addq.w     #1,d0
+        move.w     d0,noise
+        and.w      #31,d0
+        move.w     #%11110110,d1         ; channel A + noise
+        cmp.w      #8,d0
+        ble.b      .donoise
+        move.b      #%11111110,d1       ; clear noise
+.donoise
+        move.b     #7,$ff8800            ; access Yamaha register 7
+        move.b     d1,$ff8802            ; turn on channel A
+;        dbra       d7,updsndLoop
+
+        ; END
+ ;       move.b     #7,$ff8800            ; access Yamaha register 7
+ ;       move.b     #$ff,$ff8802          ; stop all channels
+        rts
+
 
 Indices:	dc.w		-1<<4, -1<<4, -1<<4, -1<<4, 2<<4, 4<<4, 6<<4, 8<<4
 Diffs:		dc.b		8,9,10,11, 12,14,15,17 
@@ -1059,6 +1134,11 @@ textEnd:		even
 ;---------------------------------------------------------
                 section bss
                 even
+
+freq      ds.w       1
+noise     ds.w       1
+vol       ds.w       1
+framecnt  ds.w       1
 
 textImg:		ds.b	2048*8
 
