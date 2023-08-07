@@ -1,0 +1,29 @@
+{
+	"FontImage":"resources/fontprp2.png",
+	"FontLexic":"!#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|} ",
+	"Strings":
+	[
+		["LOADING...                       vers 1.22474487139 "],
+		[
+			"ATARI LOVES BOMBS (ALB) runs on a standard Atari STE 1040 (1MB ram), and fits in a 720 kb floppy disk. It can also run from HDD, because TOS is used for disk access.\r",
+			"ALB doesn't use a soundtracker replay, all music is soundchips (YM) or Adpcm (8:4,8:3). Adpcm samples are played in realtime by Xdpcm 0.7b.\r",
+			"On an Atari STE, Xdpcm can depack 8bit samples @ 220 kbytes/s (1760 kbits/s), with 8:4 or 8:3 ratios. Xdpcm ratio 8:3 is used for music (12,5khz), voices & sfx (6,25khz).\r",
+		],
+		[
+			"A long time ago, in a country far, far away to the West, our crew was formed to produce 8 & 16 bit unambitious demos.\r",
+			"One day, as we were going to a party far, far away to the North, we fell into a deep freeze.",
+			" 30 years later, through global warming, almost everyone has been defrosted.\r",
+			"That's why we really thank all oil companies for saving us: Heart to you, guys !!! ",
+			"Because our brain kernels are not fully unfrozen, we reject all complaints about this demo.\r",
+		],
+		[		
+			"No graphic designers were mistreated during the production. It doesn't matter, we don't have any more in stock.\r",
+			"ALB is purely fictional and any resemblance to actual individuals or events is coincidental.\r",
+			"Thanks to Leonard/OXG for his technical support and the ARJ7. Thanks to Little Rabbit for his real-hardware testing support",
+			" (3 full days, 21 versions, with a 520 STE 4MB and an original floppy disk drive).\r",
+		],
+	]
+}
+
+
+
