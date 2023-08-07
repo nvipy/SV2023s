@@ -154,7 +154,7 @@ introLoop:
     move.b     #%11111110,$ff8802    ; turn on channel A, no noise
 
     move.b     #8,$ff8800            ; channel A volume
-    move.b     #%111,$ff8802         ; channel A volume = 7
+    move.b     #0,$ff8802            ; channel A volume = 7
 
 
 	lea		SeqWaitIntro,a0
@@ -908,9 +908,10 @@ updateSound:
         addq.w     #1,d2
         move.w     d2,framecnt
         lsr.w      #4,d2
-        cmp.w      #15,d2
+        add.w      #4,d2 ; start volume
+        cmp.w      #12,d2
         ble.b      noclampvol
-        move.w     #15,d2
+        move.w     #12,d2
 noclampvol:		  
         move.b     #8,$ff8800            ; channel A volume
         move.b     d2,$ff8802
