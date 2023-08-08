@@ -25,6 +25,7 @@ run:
 	
 	bsr		SwapSTEBuffers
 
+
 	lea		Sequence,a0
 	lea		SequenceEnd,a1
 	bsr		TASK_initSequence	;A0: SequencePtr, A1: end of SequencePtr Set TASK_SeqIsRunning to 1
@@ -93,7 +94,7 @@ Sequence:
 		TASK_MAKE	NULL,introLoop,TASK_MAX_DURATION,0
 
 SeqWaitIntro:
-        TASK_MAKE   NULL,initfader12,TASK_MAX_DURATION,0
+		TASK_MAKE	NULL,initfader12,TASK_MAX_DURATION,0
 		TASK_MAKE	NULL,fader,TASK_MAX_DURATION,0
 		TASK_MAKE	NULL,initfader23,TASK_MAX_DURATION,0
 		TASK_MAKE	NULL,fader,TASK_MAX_DURATION,0
@@ -111,51 +112,22 @@ SeqWaitIntro:
 		TASK_MAKE	initfader20,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	fader,NULL,TASK_MAX_DURATION,0
 
+		TASK_MAKE	initRTZScreen,NULL,TASK_MAX_DURATION,0
+
+		TASK_MAKE	NULL,NULL,25,0
+
 		TASK_MAKE	playAudio,NULL,TASK_MAX_DURATION,0
-		TASK_MAKE	PlayOpenRTZ,RTZ_vbl,TASK_MAX_DURATION,0
-		TASK_MAKE	PlayRTZ,RTZ_vbl,TASK_MAX_DURATION,0
+		TASK_MAKE	playOpenRTZ,RTZ_vbl,TASK_MAX_DURATION,0
+		TASK_MAKE	playRTZ,RTZ_vbl,TASK_MAX_DURATION,0
 
 		TASK_MAKE	NULL,NULL,TASK_MAX_DURATION,0
 SequenceEnd:
 
+
+
 ;------------------------------
 introLoop:
-    ; init sound
-    move.b     #7,$ff8800            ; access Yamaha register 7
-    move.b     #$ff,$ff8802
-    move.w     #1,freq
-    move.w     #7,noise
-    move.w     #0,framecnt
-    move.w     #0,vol
-
-    move.w     freq,d0
-    addq.w     #1,d0
-    and.w      #15,d0
-    move.w     d0,freq
-    add.w      #40000,d0             ; min freq
-    move.b     #0,$ff8800            ; channel A volume
-    move.b     d0,$ff8802            ; freq low
-    move.b     #1,$ff8800            ; channel A volume
-    lsr.w      #8,d0
-    move.b     d0,$ff8802            ; freq hi
-
-    move.b     #11,$ff8800           ; volume over time LOW
-    move.b     #%1100,$ff8802        ; volume over time
-    move.b     #12,$ff8800           ; volume over time HI
-    move.b     #%1,$ff8802           ; volume over time
-
-    move.b     #13,$ff8800           ; envelope
-    move.b     #%1010,$ff8802        ; sine
-
-    move.b     #6,$ff8800            ; NOISE
-    move.b     #100,$ff8802
-
-    move.b     #7,$ff8800            ; access Yamaha register 7
-    move.b     #%11111110,$ff8802    ; turn on channel A, no noise
-
-    move.b     #8,$ff8800            ; channel A volume
-    move.b     #0,$ff8802            ; channel A volume = 7
-
+	bsr		initSound
 
 	lea		SeqWaitIntro,a0
 	bsr		TASK_do
@@ -334,7 +306,7 @@ initRTZ:
 	bsr		decodeMono
 	bsr		makeStereo
 
-	bsr		InitRTZ3
+	bsr		initRTZ3
 
 	move.w		#160*96,rzTopOfs
 	move.w		#0,rzHeight
@@ -354,15 +326,23 @@ initRTZ:
 
 ;---------------------------------------------------------
 playAudio:
-	bsr		ClearAllScreenSTEBuffer
 	bsr		AUD_play
+	TASK_NEXT
+	rts
+
+;---------------------------------------------------------
+initRTZScreen:
+	move.b		#8,$ffff8800.w            ; clear channel A volume
+	clr.b		$ffff8802.w
+
+	bsr		ClearAllScreenSTEBuffer
 	lea		cmapRTZ,a0
 	bsr		SetColors	; a0 = palette ptr  
 	TASK_NEXT
 	rts
 
 ;---------------------------------------------------------
-PlayRTZ:
+playRTZ:
 ;	move.w		#$700,$ffff8240
 
 	move.w		zoomOfs,d0
@@ -461,13 +441,13 @@ sftInc:		dc.w	2010,$c000,2008,$c08f,2008,$c08e,2008,$c08d,2008,$c08c,2008,$c08b,
 ;	rts
 
 ;-----------------------------------------------
-PlayOpenRTZ:
+playOpenRTZ:
 	move.w		rzTopOfs,d0
 	sub.w		#160*2,d0
 	bmi.s		.next
 	move.w		d0,rzTopOfs
 	add.w		#2,rzHeight
-	bsr		PlayRTZ
+	bsr		playRTZ
 	rts
 .next:
 	TASK_NEXT
@@ -478,7 +458,7 @@ wt 	= 	128;128
 ht 	= 	64;16
 
 ;---------------------------------------------------------
-InitRTZ3:
+initRTZ3:
 	lea	rzimg,a0
 	lea	texture,a2
 	move.l	#65536*2,d0
@@ -738,6 +718,7 @@ DrawRTZ2:
 	swap		d5
 	move.b		d5,d6
 	move.w		xyCenter+2,d5
+	lea		160+(20-wordCount)*8.w,a5
 	move.l		#65536*2,d4
 
 .drtzloop2
@@ -753,8 +734,9 @@ DrawRTZ2:
 	lea		(a1,d4.l),a2
 	lea		(a2,d4.l),a3
 	bsr		Rasterize2
-	add.w		#160+(20-wordCount)*8,a4
-	add.w		#160+(20-wordCount)*8,a5
+	;add.w		#160+(20-wordCount)*8,a4
+	add.w		a5,a4
+	;add.w		#160+(20-wordCount)*8,a5
 
 	dbra		d3,.drtzloop2
 
@@ -803,6 +785,82 @@ Hx:		dc.b	0,0
 ;		AUDIO
 ;
 ;**********************************************************************
+
+initSound:
+    ; init sound
+    move.b     #7,$ffff8800.w            ; access Yamaha register 7
+    move.b     #$ff,$ffff8802.w
+    move.w     #1,freq
+    move.w     #7,noise
+    move.w     #0,framecnt
+    move.w     #0,vol
+
+    move.w     freq,d0
+    addq.w     #1,d0
+    and.w      #15,d0
+    move.w     d0,freq
+    add.w      #40000,d0             ; min freq
+    move.b     #0,$ffff8800.w            ; channel A volume
+    move.b     d0,$ffff8802.w            ; freq low
+    move.b     #1,$ffff8800.w            ; channel A volume
+    lsr.w      #8,d0
+    move.b     d0,$ffff8802.w            ; freq hi
+
+    move.b     #11,$ffff8800.w           ; volume over time LOW
+    move.b     #%1100,$ffff8802.w        ; volume over time
+    move.b     #12,$ffff8800.w           ; volume over time HI
+    move.b     #%1,$ffff8802.w           ; volume over time
+
+    move.b     #13,$ffff8800.w           ; envelope
+    move.b     #%1010,$ffff8802.w        ; sine
+
+    move.b     #6,$ffff8800.w            ; NOISE
+    move.b     #100,$ffff8802.w
+
+    move.b     #7,$ffff8800.w            ; access Yamaha register 7
+    move.b     #%11111110,$ffff8802.w    ; turn on channel A, no noise
+
+    move.b     #8,$ffff8800.w            ; channel A volume
+    move.b     #0,$ffff8802.w            ; channel A volume = 7
+
+    rts
+
+updateSound:
+;        move.w     #67,d7
+;updsndLoop:
+;        WAIT_VBL
+
+        ; RAMP UP VOLUME
+        move.w     framecnt,d2
+        addq.w     #1,d2
+        move.w     d2,framecnt
+        lsr.w      #4,d2
+        add.w      #4,d2 ; start volume
+        cmp.w      #12,d2
+        ble.b      noclampvol
+        move.w     #12,d2
+noclampvol:		  
+        move.b     #8,$ffff8800.w            ; channel A volume
+        move.b     d2,$ffff8802.w
+
+
+        move.w     noise,d0
+        addq.w     #1,d0
+        move.w     d0,noise
+        and.w      #31,d0
+        move.w     #%11110110,d1         ; channel A + noise
+        cmp.w      #8,d0
+        ble.b      .donoise
+        move.b      #%11111110,d1       ; clear noise
+.donoise
+        move.b     #7,$ffff8800.w            ; access Yamaha register 7
+        move.b     d1,$ffff8802.w            ; turn on channel A
+;        dbra       d7,updsndLoop
+
+        ; END
+ ;       move.b     #7,$ff8800            ; access Yamaha register 7
+ ;       move.b     #$ff,$ff8802          ; stop all channels
+        rts
 
 ;------------------------------------------------------------------------------
 ; create Diff.Indice table
@@ -897,43 +955,6 @@ iapart2:
 		dbf		d2,.1
 
 		rts
-
-updateSound:
-;        move.w     #67,d7
-;updsndLoop:
-;        WAIT_VBL
-
-        ; RAMP UP VOLUME
-        move.w     framecnt,d2
-        addq.w     #1,d2
-        move.w     d2,framecnt
-        lsr.w      #4,d2
-        add.w      #4,d2 ; start volume
-        cmp.w      #12,d2
-        ble.b      noclampvol
-        move.w     #12,d2
-noclampvol:		  
-        move.b     #8,$ff8800            ; channel A volume
-        move.b     d2,$ff8802
-
-
-        move.w     noise,d0
-        addq.w     #1,d0
-        move.w     d0,noise
-        and.w      #31,d0
-        move.w     #%11110110,d1         ; channel A + noise
-        cmp.w      #8,d0
-        ble.b      .donoise
-        move.b      #%11111110,d1       ; clear noise
-.donoise
-        move.b     #7,$ff8800            ; access Yamaha register 7
-        move.b     d1,$ff8802            ; turn on channel A
-;        dbra       d7,updsndLoop
-
-        ; END
- ;       move.b     #7,$ff8800            ; access Yamaha register 7
- ;       move.b     #$ff,$ff8802          ; stop all channels
-        rts
 
 
 Indices:	dc.w		-1<<4, -1<<4, -1<<4, -1<<4, 2<<4, 4<<4, 6<<4, 8<<4
@@ -1048,18 +1069,18 @@ AUD_play:
 
 		lea		$22(a0),a1
 		lea		$24(a0),a2
-		move.w		#%11111111111,d0		; set volume max and DMA only on microwire
+		move.w		#%11111111111,d0
 		move.w		d0,(a2)
-		move.w		#%10000000010,(a1)
+		move.w		#%10000000001,(a1)		; set mix
 .0:		cmp.w		(a2),d0
 		bne.s		.0
 		move.w		#%10011101000,(a1)		; master volume
 .1:		cmp.w		(a2),d0
 		bne.s		.1
-		move.w		#%10101010100,(a1)
+		move.w		#%10101010100,(a1)		; left channel volume
 .2:		cmp.w		(a2),d0
 		bne.s		.2
-		move.w		#%10100010100,(a1)
+		move.w		#%10100010100,(a1)		; right channel volume
 .3:		cmp.w		(a2),d0
 		bne.s		.3
 
