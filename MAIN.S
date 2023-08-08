@@ -332,8 +332,10 @@ playAudio:
 
 ;---------------------------------------------------------
 initRTZScreen:
-	move.b		#8,$ffff8800.w            ; clear channel A volume
-	clr.b		$ffff8802.w
+	move.b		#7,$ffff8800.w
+    move.b      sndRegSav,d0
+    or.b        #%111111,d0
+    move.b      d0,$ffff8802.w    ; switch off all sound & noise channels, restore original PORT values
 
 	bsr		ClearAllScreenSTEBuffer
 	lea		cmapRTZ,a0
@@ -788,52 +790,47 @@ Hx:		dc.b	0,0
 
 initSound:
     ; init sound
-    move.b     #7,$ffff8800.w            ; access Yamaha register 7
-    move.b     #$ff,$ffff8802.w
-    move.w     #1,freq
-    move.w     #7,noise
-    move.w     #0,framecnt
-    move.w     #0,vol
+    lea        $ffff8800,a0
+    lea        2(a0),a1
+    lea        soundvars,a2
 
-    move.w     freq,d0
-    addq.w     #1,d0
-    and.w      #15,d0
-    move.w     d0,freq
-    add.w      #40000,d0             ; min freq
-    move.b     #0,$ffff8800.w            ; channel A volume
-    move.b     d0,$ffff8802.w            ; freq low
-    move.b     #1,$ffff8800.w            ; channel A volume
-    lsr.w      #8,d0
-    move.b     d0,$ffff8802.w            ; freq hi
+    move.w      #7,(a0)
+    move.b      (a0),4(a2)         ; sndRegSav
 
-    move.b     #11,$ffff8800.w           ; volume over time LOW
-    move.b     #%1100,$ffff8802.w        ; volume over time
-    move.b     #12,$ffff8800.w           ; volume over time HI
-    move.b     #%1,$ffff8802.w           ; volume over time
+    move.w     #7,(a2)
+    move.w     #0,2(a2)           ; framecnt
 
-    move.b     #13,$ffff8800.w           ; envelope
-    move.b     #%1010,$ffff8802.w        ; sine
+    move.b     #0,(a0)            ; channel A freq low
+    move.b     #%1000000,(a1)     ; freq low
+    move.b     #1,(a0)            ; channel A freq hi
+    move.b     #%10011100,(a1)    ; freq hi
 
-    move.b     #6,$ffff8800.w            ; NOISE
-    move.b     #100,$ffff8802.w
+    move.b     #11,(a0)           ; volume over time LOW
+    move.b     #%1100,(a1)        ; volume over time
+    move.b     #12,(a0)           ; volume over time HI
+    move.b     #%1,(a1)           ; volume over time
 
-    move.b     #7,$ffff8800.w            ; access Yamaha register 7
-    move.b     #%11111110,$ffff8802.w    ; turn on channel A, no noise
+    move.b     #13,(a0)           ; envelope
+    move.b     #%1010,(a1)        ; sine
 
-    move.b     #8,$ffff8800.w            ; channel A volume
-    move.b     #0,$ffff8802.w            ; channel A volume = 7
+    move.b     #6,(a0)            ; NOISE
+    move.b     #100,(a1)
+
+    move.b     #7,(a0)            ; access Yamaha register 7
+    move.b     #%111110,(a1)    ; turn on channel A, no noise
+
+    move.b     #8,(a0)            ; channel A volume
+    move.b     #0,(a1)
 
     rts
 
 updateSound:
-;        move.w     #67,d7
-;updsndLoop:
-;        WAIT_VBL
+        lea        soundvars,a2
 
         ; RAMP UP VOLUME
-        move.w     framecnt,d2
+        move.w     2(a2),d2
         addq.w     #1,d2
-        move.w     d2,framecnt
+        move.w     d2,2(a2)
         lsr.w      #4,d2
         add.w      #4,d2 ; start volume
         cmp.w      #12,d2
@@ -844,22 +841,18 @@ noclampvol:
         move.b     d2,$ffff8802.w
 
 
-        move.w     noise,d0
+        move.w     (a2),d0
         addq.w     #1,d0
-        move.w     d0,noise
+        move.w     d0,(a2)
         and.w      #31,d0
-        move.w     #%11110110,d1         ; channel A + noise
+        move.w     #%110110,d1         ; channel A + noise
         cmp.w      #8,d0
         ble.b      .donoise
-        move.b      #%11111110,d1       ; clear noise
+        move.b      #%111110,d1       ; clear noise
 .donoise
         move.b     #7,$ffff8800.w            ; access Yamaha register 7
         move.b     d1,$ffff8802.w            ; turn on channel A
-;        dbra       d7,updsndLoop
 
-        ; END
- ;       move.b     #7,$ff8800            ; access Yamaha register 7
- ;       move.b     #$ff,$ff8802          ; stop all channels
         rts
 
 ;------------------------------------------------------------------------------
@@ -1156,11 +1149,10 @@ textEnd:		even
 ;---------------------------------------------------------
                 section bss
                 even
-
-freq      ds.w       1
+soundvars:
 noise     ds.w       1
-vol       ds.w       1
 framecnt  ds.w       1
+sndRegSav ds.w       1 
 
 textImg:		ds.b	2048*8
 
