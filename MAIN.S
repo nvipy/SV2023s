@@ -16,15 +16,17 @@ run:
 
 	dc.l		$a000a00a              ;Mouse off
 	bsr		SetSuper
-	bsr		StopMFP
+	;bsr		StopMFP
 	bsr		SaveScreen
 
 	move.l		#buffers,d0
-	move.l		#256,d1
+	move.l		#WSCREEN_BYTES*8,d1
 	bsr		SetSTEBuffers
 	
 	bsr		SwapSTEBuffers
 
+	moveq		#40,d0
+	bsr		AUD_setVolume
 
 	lea		Sequence,a0
 	lea		SequenceEnd,a1
@@ -60,7 +62,7 @@ mainloop:
 	move.w 		#$70,$ffff8240.w
 	bsr		RestoreScreen
 	move.w 		#$7,$ffff8240.w
-	bsr		RestoreMFP
+	;bsr		RestoreMFP
 	move.w 		#$fff,$ffff8240.w
 	bsr		SetUser
 	dc.l		$a000a009               ;Mouse on
@@ -118,7 +120,8 @@ SeqWaitIntro:
 
 		TASK_MAKE	playAudio,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	playOpenRTZ,RTZ_vbl,TASK_MAX_DURATION,0
-		TASK_MAKE	playRTZ,RTZ_vbl,TASK_MAX_DURATION,0
+		TASK_MAKE	playRTZ,RTZ_vbl,25*4,0
+		TASK_MAKE	playCloseRTZ,RTZ_vbl,TASK_MAX_DURATION,0
 
 		TASK_MAKE	NULL,NULL,TASK_MAX_DURATION,0
 SequenceEnd:
@@ -309,7 +312,7 @@ initRTZ:
 	bsr		initRTZ3
 
 	move.w		#160*96,rzTopOfs
-	move.w		#0,rzHeight
+	clr.w		rzHeight
 
 	lea		font,a0
 	bsr		PROPFONT_initFontAndStrings				; A0 = FontDesc data
@@ -321,31 +324,66 @@ initRTZ:
 	moveq		#8-1,d2
 	bsr		PROPFONT_print		; A0 = string, A1 = destination, D0 = dest width, D1 = string length, D2 = font height-1, Return D3 = chr count
 
+	move.w		#36*20,RasterizeRtsOfs
+	move.w		#160+(20-wordCount)*8,RasterizeMod
+	move.w		#0,RasterizeScrOfs
+
+	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YClr
+	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YScroll
+
 	clr.w		TASK_WhileValue
 	rts
 
 ;---------------------------------------------------------
 playAudio:
 	bsr		AUD_play
+	moveq		#40,d0
+	bsr		AUD_setVolume
+
 	TASK_NEXT
 	rts
 
 ;---------------------------------------------------------
 initRTZScreen:
 	move.b		#7,$ffff8800.w
-    move.b      sndRegSav,d0
-    or.b        #%111111,d0
-    move.b      d0,$ffff8802.w    ; switch off all sound & noise channels, restore original PORT values
+;	move.b		sndRegSav,d0
+;	or.b		#%111111,d0
+	moveq		#%111111,d0
+	or.b		sndRegSav,d0
+	move.b		d0,$ffff8802.w    ; switch off all sound & noise channels, restore original PORT values
 
 	bsr		ClearAllScreenSTEBuffer
 	lea		cmapRTZ,a0
 	bsr		SetColors	; a0 = palette ptr  
+
+	moveq		#40,d0
+	moveq		#0,d1
+	move.w		#256,d2
+	bsr		AUD_setFadeVol	; d0 = start, d1 = end [0..40], d2 = step
+
 	TASK_NEXT
 	rts
+
+;-----------------------------------------------
+playOpenRTZ:
+	move.w		rzTopOfs,d0
+	sub.w		#160*2,d0
+	bmi.s		.next
+	move.w		d0,rzTopOfs
+	add.w		#2,rzHeight
+	bsr.s		playRTZ
+	rts
+.next:
+	TASK_NEXT
+	rts	
 
 ;---------------------------------------------------------
 playRTZ:
 ;	move.w		#$700,$ffff8240
+
+;	move.w		#0,rzTopOfs
+;	move.w		#32,rzHeight
+
 
 	move.w		zoomOfs,d0
 	and.w		#4095,d0
@@ -370,14 +408,52 @@ playRTZ:
 	and.w		#$ffc,alpha
 
  ;	move.w		#$777,$ffff8240
+
+.wait2vbl:
+	move.w		VblStrobe,d0
+	subq.w		#2,d0
+	bmi.s		.wait2vbl
+
 	bsr		SwapSTEBuffers
 
 	rts
 
+
+;-----------------------------------------------
+playCloseRTZ:
+	bsr		AUD_fadeVol
+
+	sub.w		#1,rzHeight
+
+	move.w		YScroll,d0
+	move.w		d0,YClr
+	sub.w		#WSCREEN_BYTES*2,d0
+	move.w		d0,YScroll
+	add.w		#9*WSCREEN_BYTES,d0
+	beq.s		.next
+
+	bsr		playRTZ
+
+	rts
+.next:
+	moveq		#0,d0
+	bsr		AUD_setVolume
+	bsr		playRTZ
+	TASK_NEXT
+	rts	
+
+RasterizeRtsOfs:	dc.w	0
+RasterizeMod:		dc.w	0
+RasterizeScrOfs:	dc.w	0
+YClr:			dc.w	0
+YScroll:		dc.w	0
+
 ;-----------------------------------------------
 RTZ_vbl
-	move.l		backBuf,a1
-	lea		(HSCREEN-9)*WSCREEN_BYTES(a1),a1
+	move.l		frontBuf,a1
+	move.l		a1,a3
+;	lea		(HSCREEN-9)*WSCREEN_BYTES(a1),a1
+	add.w		YClr,a1
 
 	lea		$ffff8a28.w,a2			; First register needed
 	moveq		#-1,d0
@@ -386,12 +462,14 @@ RTZ_vbl
 	moveq		#2,d0				; DstXinc.DstYinc
 	move.l		d0,(a2)+			; DstXinc.DstYinc
 	move.l		a1,(a2)+			; DstPtr
-	move.l		#(1<<16)+9*80,(a2)+		; Width.Height
+	move.l		#(1<<16)+12*80,(a2)+		; Width.Height
 	move.l		#$0000c000,(a2)			; Hop 
 
 	lea		textImg,a0
 
-	lea		160+6(a1),a1
+;	lea		160+6(a1),a1
+	add.w		YScroll,a3
+	lea		160+6(a3),a3
 
 	moveq		#2,d0
 	swap		d0
@@ -415,7 +493,7 @@ RTZ_vbl
 	move.l		d2,(a2)+			; Fmsk.Mmsk
 	move.w		d2,(a2)+			; Lmsk
 	move.l		#$00080008,(a2)+		; DstXinc.DstYinc
-	move.l		a1,(a2)+			; DstPtr
+	move.l		a3,(a2)+			; DstPtr
 	move.l		#$00140008,(a2)+		; Width.Height
 	move.l		d1,(a2)				; Hop 
 	rts
@@ -423,37 +501,6 @@ RTZ_vbl
 txtpos:		dc.w	0
 sftInc:		dc.w	2010,$c000,2008,$c08f,2008,$c08e,2008,$c08d,2008,$c08c,2008,$c08b,2008,$c08a,2008,$c089	;	2+2048-40-2
 		dc.w	2008,$c088,2008,$c087,2008,$c086,2008,$c085,2008,$c084,2008,$c083,2008,$c082,2008,$c081	;	2+2048-40-2
-
-
-
-;	lea		textImg,a0
-;	move.l		frontBuf,a1
-;	lea		(HSCREEN-8)*WSCREEN_BYTES(a1),a1
-
-;	lea		$ffff8a20.w,a2			; First register needed
-;	moveq		#-1,d2				; msk
-;	move.l		#$00020002+2048-40-2,(a2)+	; SrcXinc.SrcYinc
-;	move.l		a0,(a2)+			; SrcPtr
-;	move.l		d2,(a2)+			; Fmsk.Mmsk
-;	move.w		d2,(a2)+			; Lmsk
-;	move.l		#$00080008,(a2)+		; DstXinc.DstYinc
-;	move.l		a1,(a2)+			; DstPtr
-;	move.l		#$00140008,(a2)+		; Width.Height
-;	move.l		#$0203c08f,(a2)			; Hop 
-;	rts
-
-;-----------------------------------------------
-playOpenRTZ:
-	move.w		rzTopOfs,d0
-	sub.w		#160*2,d0
-	bmi.s		.next
-	move.w		d0,rzTopOfs
-	add.w		#2,rzHeight
-	bsr		playRTZ
-	rts
-.next:
-	TASK_NEXT
-	rts	
 
 ;-----------------------------------------------
 wt 	= 	128;128
@@ -708,10 +755,15 @@ DrawRTZ2:
 	lea		texture+32768*2,a6
 	move.l		backBuf,a4
 	add.w		rzTopOfs,a4
+	add.w		RasterizeScrOfs,a4
 	add.w		#(20-wordCount)*4,a4
 	lea		160(a4),a5
 ;	moveq.		#rowCount-1,d3
+	move.w		RasterizeMod,a5
 	move.w		rzHeight,d3
+	bpl.s		.draw
+	rts
+.draw:
 ;	moveq.		#0,d5
 ;	moveq.		#0,d6
 	moveq		#0,d5
@@ -720,7 +772,6 @@ DrawRTZ2:
 	swap		d5
 	move.b		d5,d6
 	move.w		xyCenter+2,d5
-	lea		160+(20-wordCount)*8.w,a5
 	move.l		#65536*2,d4
 
 .drtzloop2
@@ -735,7 +786,7 @@ DrawRTZ2:
 	lea		(a0,d4.l),a1
 	lea		(a1,d4.l),a2
 	lea		(a2,d4.l),a3
-	bsr		Rasterize2
+	bsr.s		Rasterize2
 	;add.w		#160+(20-wordCount)*8,a4
 	add.w		a5,a4
 	;add.w		#160+(20-wordCount)*8,a5
@@ -794,13 +845,14 @@ initSound:
     lea        2(a0),a1
     lea        soundvars,a2
 
-    move.w      #7,(a0)
-    move.b      (a0),4(a2)         ; sndRegSav
+    moveq      #7,d0
+    move.w     d0,(a0)
+    move.b     (a0),4(a2)         ; sndRegSav
 
-    move.w     #7,(a2)
-    move.w     #0,2(a2)           ; framecnt
+    move.w     d0,(a2)
+    clr.w      2(a2)           ; framecnt
 
-    move.b     #0,(a0)            ; channel A freq low
+    clr.b      (a0)            ; channel A freq low
     move.b     #%1000000,(a1)     ; freq low
     move.b     #1,(a0)            ; channel A freq hi
     move.b     #%10011100,(a1)    ; freq hi
@@ -816,11 +868,11 @@ initSound:
     move.b     #6,(a0)            ; NOISE
     move.b     #100,(a1)
 
-    move.b     #7,(a0)            ; access Yamaha register 7
+    move.b     d0,(a0)            ; access Yamaha register 7
     move.b     #%111110,(a1)    ; turn on channel A, no noise
 
     move.b     #8,(a0)            ; channel A volume
-    move.b     #0,(a1)
+    clr.b      (a1)
 
     rts
 
@@ -832,14 +884,13 @@ updateSound:
         addq.w     #1,d2
         move.w     d2,2(a2)
         lsr.w      #4,d2
-        add.w      #4,d2 ; start volume
+        addq.w     #4,d2 ; start volume
         cmp.w      #12,d2
         ble.b      noclampvol
         move.w     #12,d2
 noclampvol:		  
         move.b     #8,$ffff8800.w            ; channel A volume
         move.b     d2,$ffff8802.w
-
 
         move.w     (a2),d0
         addq.w     #1,d0
@@ -848,7 +899,7 @@ noclampvol:
         move.w     #%110110,d1         ; channel A + noise
         cmp.w      #8,d0
         ble.b      .donoise
-        move.b      #%111110,d1       ; clear noise
+        move.b     #%111110,d1       ; clear noise
 .donoise
         move.b     #7,$ffff8800.w            ; access Yamaha register 7
         move.b     d1,$ffff8802.w            ; turn on channel A
@@ -1056,6 +1107,62 @@ makeStereo:
 		rts
 
 ;------------------------------------------------------------------
+AUD_setVolume:	; d0 = volume [0..40]
+		lea		$ffff8900.w,a0
+		lea		$22(a0),a1
+		lea		$24(a0),a2
+		move.w		#%11111111111,d2
+		move.w		d2,(a2)
+
+;		move.w		#%10000000001,(a1)		; set mix
+;.0:		cmp.w		(a2),d2
+;		bne.s		.0
+
+		move.w		#%10011000000,d1
+		or.b		d0,d1
+		move.w		d1,(a1)				; master volume
+		;move.w		#%10011000000,(a1)		; master volume, max = #%10011101000
+
+.1:		cmp.w		(a2),d2
+		bne.s		.1
+		rts
+;------------------------------------------------------------------
+AUD_setFadeVol:	; d0 = start, d1 = end [0..40], d2 = step
+		lsl.w		#8,d0
+		lsl.w		#8,d1
+		sub.w		d0,d1
+		ext.l		d1
+		divs		d2,d1
+		movem.w		d0-d2,AUD_Volume
+		rts
+
+;------------------------------------------------------------------
+AUD_fadeVol:
+		lea		AUD_Volume,a0
+		move.w		4(a0),d0
+		;subq.w		#1,d0
+		;bmi.s		.next
+		dbra		d0,.setvol
+		moveq		#-1,d0
+		rts
+.setvol:
+;		BGC	-1
+;uu:
+		move.w		d0,4(a0)
+
+		move.w		(a0)+,d1
+		move.w		d1,d0
+		add.w		(a0),d1
+		move.w		d1,-(a0)
+		lsr.w		#8,d0
+		bsr.s		AUD_setVolume
+
+		moveq		#0,d0
+		rts
+
+AUD_Volume:	dc.w		0,0,0	; cur, inc, step
+
+;------------------------------------------------------------------
 AUD_play:
 		lea		$ffff8900.w,a0
 		clr.b		1(a0)
@@ -1067,7 +1174,8 @@ AUD_play:
 		move.w		#%10000000001,(a1)		; set mix
 .0:		cmp.w		(a2),d0
 		bne.s		.0
-		move.w		#%10011101000,(a1)		; master volume
+		move.w		#%10011000000,(a1)		; master volume, max = #%10011101000
+		;move.w		#%10011101000,(a1)		; master volume, max = #%10011101000
 .1:		cmp.w		(a2),d0
 		bne.s		.1
 		move.w		#%10101010100,(a1)		; left channel volume
@@ -1165,10 +1273,12 @@ DblDiffIndices:		ds.b	AUDIO_DBL_DIFF_INDICES_SIZE
 
 sin:			ds.b	1024*2
 cos:			ds.b	1024*4
-			ds.b	32768
-buffers:		ds.b	65536
+			ds.b	2*50*120
+buffers:		ds.b	WSCREEN_BYTES*(HSCREEN*2+64)
 texture:		ds.b	65536*8
 sample:			ds.b	MUSIC_LENGTH*8
+			ds.b	16384
+
 endsample:	
 
 
