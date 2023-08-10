@@ -35,22 +35,11 @@ run:
 	lea		Vbl,a0
 	bsr		SetVbl
 
-;	clr.w		VblStrobe
-	
 mainloop:
 
 	WAIT_VBL
 	TASK_CALL	_TASK_Main		; Task call macro, /1: _TASK_Main or _TASK_Vbl, return -1 if seq finished
-	;move.l		#$fff0000,$ffff8240.w
 
-
-;	tst.w		VblStrobe
-;	beq.s		.0
-
-;	bsr.s		PlayRTZ
-;	clr.w		VblStrobe
-
-;.0:	
 	cmp.b		#$39,$fffc02
 	bne.s		mainloop
 
@@ -78,23 +67,15 @@ Vbl:
 	rte				
 
 
-;	addq.w		#1,VblStrobe
-;	rte	
 
-;VblStrobe:	dc.w	0
-
+;-----------------------------------------------
 Sequence:
 		TASK_MAKE	initTitle,NULL,TASK_MAX_DURATION,0
-
 		TASK_MAKE	initRTZ,initfader01,TASK_MAX_DURATION,0
 
-		;TASK_MAKE	NULL,initfader01,TASK_MAX_DURATION,0
 		TASK_MAKE	NULL,fader,TASK_MAX_DURATION,0
-
 		TASK_MAKE	NULL,NULL,30,0
-
 		TASK_MAKE	NULL,introLoop,TASK_MAX_DURATION,0
-
 SeqWaitIntro:
 		TASK_MAKE	NULL,initfader12,TASK_MAX_DURATION,0
 		TASK_MAKE	NULL,fader,TASK_MAX_DURATION,0
@@ -120,7 +101,7 @@ SeqWaitIntro:
 
 		TASK_MAKE	playAudio,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	playOpenRTZ,RTZ_vbl,TASK_MAX_DURATION,0
-		TASK_MAKE	playRTZ,RTZ_vbl,25*4,0
+		TASK_MAKE	playRTZ,RTZ_vbl,25*60,0
 		TASK_MAKE	playCloseRTZ,RTZ_vbl,TASK_MAX_DURATION,0
 
 		TASK_MAKE	NULL,NULL,TASK_MAX_DURATION,0
@@ -178,7 +159,6 @@ initTitle:
 	bsr		IMG_get4Bits		; d0 = dest word width, d1 = dest height, d2 = flag, a0 = image data, a1 = screens destinations, a6: image struct
 
 	WAIT_VBL
-;	lea		titleXImgStruct+_IMG_Cmap,a0
 	lea		cmapBlack,a0
 	bsr		SetColors		; a0 = palette ptr  
 	bsr		SwapSTEBuffers
@@ -214,8 +194,6 @@ initTitle:
 .setPal:
 	move.l		a2,-(sp)
 	moveq		#16-1,d5
-;	lea		cmapBlack,a0
-;	lea		titleXImgStruct+_IMG_Cmap,a1
 	bsr		InitInnerShading	; d5 = ncolor-1 (must be <= 16), a0 = cmap0, a1 = cmap1 
 
 	move.l		(sp)+,a4
@@ -271,7 +249,7 @@ initfader32:
 
 ;---------------------------------------------------------
 fader:
-    bsr         updateSound
+	bsr		updateSound
 
 	subq.w		#1,faderCounter
 	bmi.s		.endfade
@@ -279,7 +257,6 @@ fader:
 	move.l		a0,a1
 	add.l		faderInc,a1
 	move.l		a1,faderCmap
-;	bsr		SetColors		; a0 = palette ptr 
 
 	lea		$ffff8240.w,a1
 	rept		8
@@ -346,8 +323,6 @@ playAudio:
 ;---------------------------------------------------------
 initRTZScreen:
 	move.b		#7,$ffff8800.w
-;	move.b		sndRegSav,d0
-;	or.b		#%111111,d0
 	moveq		#%111111,d0
 	or.b		sndRegSav,d0
 	move.b		d0,$ffff8802.w    ; switch off all sound & noise channels, restore original PORT values
@@ -379,12 +354,6 @@ playOpenRTZ:
 
 ;---------------------------------------------------------
 playRTZ:
-;	move.w		#$700,$ffff8240
-
-;	move.w		#0,rzTopOfs
-;	move.w		#32,rzHeight
-
-
 	move.w		zoomOfs,d0
 	and.w		#4095,d0
 	lea		cos,a0
@@ -402,12 +371,9 @@ playRTZ:
 
 	bsr		PrepareRTZ
 
- ;	move.w		#$007,$ffff8240
 	bsr		DrawRTZ2
 	addq.w		#4,alpha
 	and.w		#$ffc,alpha
-
- ;	move.w		#$777,$ffff8240
 
 .wait2vbl:
 	move.w		VblStrobe,d0
@@ -452,7 +418,6 @@ YScroll:		dc.w	0
 RTZ_vbl
 	move.l		frontBuf,a1
 	move.l		a1,a3
-;	lea		(HSCREEN-9)*WSCREEN_BYTES(a1),a1
 	add.w		YClr,a1
 
 	lea		$ffff8a28.w,a2			; First register needed
@@ -467,7 +432,6 @@ RTZ_vbl
 
 	lea		textImg,a0
 
-;	lea		160+6(a1),a1
 	add.w		YScroll,a3
 	lea		160+6(a3),a3
 
@@ -764,8 +728,6 @@ DrawRTZ2:
 	bpl.s		.draw
 	rts
 .draw:
-;	moveq.		#0,d5
-;	moveq.		#0,d6
 	moveq		#0,d5
 	move.w		xyCenter,d5
 	lsl.l		#8,d5
@@ -787,9 +749,7 @@ DrawRTZ2:
 	lea		(a1,d4.l),a2
 	lea		(a2,d4.l),a3
 	bsr.s		Rasterize2
-	;add.w		#160+(20-wordCount)*8,a4
 	add.w		a5,a4
-	;add.w		#160+(20-wordCount)*8,a5
 
 	dbra		d3,.drtzloop2
 
@@ -1016,15 +976,6 @@ AUDIO_DBL_DIFF_INDICES_SIZE	=	(AUDIO_DIFFS_SIZE*256)*4
 
 ;-----------------------------------------------
 decodeMono:
-;		lea		sample,a0
-;		move.w		#MUSIC_LENGTH/2-1,d7
-;.0
-;		clr.l		(a0)+
-;		clr.l		(a0)+
-;		clr.l		(a0)+
-;		clr.l		(a0)+
-;		dbra		d7,.0
-
 		lea		music+8,a4
 		lea		sample,a5
 		lea		DblDiffIndices,a6
@@ -1037,7 +988,6 @@ decodeMono:
 		lsr.l		#3,d0
 		subq.w		#1,d0
 
-		;move.w		#MUSIC_LENGTH/4-1,d0
 .decloop:
 u		set		0
 		rept		4
@@ -1094,7 +1044,6 @@ makeStereo:
 		lsr.l		#2,d7
 		sub.w		#256/4+1,d7
 
-		;move.w		#(MUSIC_LENGTH)/2-256/4-1,d7
 .remstereo
 		movep.l		0(a0),d0
 		movep.l		d0,1(a1)
@@ -1113,16 +1062,9 @@ AUD_setVolume:	; d0 = volume [0..40]
 		lea		$24(a0),a2
 		move.w		#%11111111111,d2
 		move.w		d2,(a2)
-
-;		move.w		#%10000000001,(a1)		; set mix
-;.0:		cmp.w		(a2),d2
-;		bne.s		.0
-
 		move.w		#%10011000000,d1
 		or.b		d0,d1
 		move.w		d1,(a1)				; master volume
-		;move.w		#%10011000000,(a1)		; master volume, max = #%10011101000
-
 .1:		cmp.w		(a2),d2
 		bne.s		.1
 		rts
@@ -1140,23 +1082,17 @@ AUD_setFadeVol:	; d0 = start, d1 = end [0..40], d2 = step
 AUD_fadeVol:
 		lea		AUD_Volume,a0
 		move.w		4(a0),d0
-		;subq.w		#1,d0
-		;bmi.s		.next
 		dbra		d0,.setvol
 		moveq		#-1,d0
 		rts
 .setvol:
-;		BGC	-1
-;uu:
 		move.w		d0,4(a0)
-
 		move.w		(a0)+,d1
 		move.w		d1,d0
 		add.w		(a0),d1
 		move.w		d1,-(a0)
 		lsr.w		#8,d0
 		bsr.s		AUD_setVolume
-
 		moveq		#0,d0
 		rts
 
@@ -1175,7 +1111,6 @@ AUD_play:
 .0:		cmp.w		(a2),d0
 		bne.s		.0
 		move.w		#%10011000000,(a1)		; master volume, max = #%10011101000
-		;move.w		#%10011101000,(a1)		; master volume, max = #%10011101000
 .1:		cmp.w		(a2),d0
 		bne.s		.1
 		move.w		#%10101010100,(a1)		; left channel volume
@@ -1208,7 +1143,6 @@ AUD_stop:
                 section data
 
 cmapRTZ:	dc.w	0,$111,$222,$333,$444,$555,$666,$777,$888,$999,$aaa,$bbb,$ccc,$ddd,$eee,$fff
-;cmapRTZ:	dc.w	000,$fff,$eee,$ddd,$ccc,$bbb,$aaa,$999,$888,$777,$666,$555,$444,$333,$222,$111
 cmapBlack:	dc.w	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 cmapWhite:	dc.w	$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff
 cmapLigth:	dc.w	$300,$410,$520,$630,$740,$852,$974,$a96,$aa8,$bb9,$cca,$eeb,$ffc,$ffd,$ffe,$fff
