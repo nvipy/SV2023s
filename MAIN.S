@@ -836,21 +836,41 @@ initSound:
 
     rts
 
+SNDFADEOUT = 140
+
 updateSound:
         lea        soundvars,a2
+	    lea        $ffff8800,a0
+	    lea        2(a0),a1
+		moveq		#12,d3
 
         ; RAMP UP VOLUME
         move.w     2(a2),d2
         addq.w     #1,d2
         move.w     d2,2(a2)
+		cmp.w	   #SNDFADEOUT,d2 ; fade out
+		bge.b	   fadeout
         lsr.w      #4,d2
         addq.w     #4,d2 ; start volume
-        cmp.w      #12,d2
+        cmp.w      d3,d2
         ble.b      noclampvol
-        move.w     #12,d2
-noclampvol:		  
-        move.b     #8,$ffff8800.w            ; channel A volume
-        move.b     d2,$ffff8802.w
+        move.w     d3,d2
+		bra.s	   noclampvol
+fadeout:
+	;	move.b     #6,(a0)            ; NOISE
+	;	move.b     d2,(a1)
+
+		sub.w		#SNDFADEOUT,d2
+		lsr.w		#1,d2
+		sub.w		d3,d2
+		bge.b		zerosnd
+		neg.w		d2
+		bra.b		noclampvol
+zerosnd:
+	    moveq		#0,d2		
+noclampvol:
+        move.b     #8,(a0)            ; channel A volume
+        move.b     d2,(a1)
 
         move.w     (a2),d0
         addq.w     #1,d0
@@ -861,8 +881,8 @@ noclampvol:
         ble.b      .donoise
         move.b     #%111110,d1       ; clear noise
 .donoise
-        move.b     #7,$ffff8800.w            ; access Yamaha register 7
-        move.b     d1,$ffff8802.w            ; turn on channel A
+        move.b     #7,(a0)            ; access Yamaha register 7
+        move.b     d1,(a1)            ; turn on channel A
 
         rts
 
