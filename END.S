@@ -6,7 +6,7 @@
 	include		"INCLUDES/BIOS.I"
 	include		"INCLUDES/SYS.I"
 	include		"INCLUDES/MATH.I"
-
+	include		"INCLUDES/IMG.I"
  
 run:
 
@@ -18,6 +18,7 @@ run:
 	move.l		#buffers,d0
 	moveq		#0,d1
 	bsr		SetSTEBuffers
+;	bsr		ClearAllScreenSTEBuffer
 	
 	bsr		SwapSTEBuffers
 
@@ -33,9 +34,9 @@ run:
 	bsr		END_init
 	bsr		END_calcAllDots
 	lea		frames+HSCREEN*40,a0
-	bsr		END_draw
+	;bsr		END_draw
 
-	bsr		SwapSTEBuffers
+	;bsr		SwapSTEBuffers
 
 	lea		$ffff8240.w,a0
 	move.l		#$fff,(a0)+
@@ -85,6 +86,76 @@ END_IMG_HEIGHT	=	80
 
 ;-----------------------------------------------
 END_init:
+	lea		sin,a0
+	moveq		#10,d0
+	move.l		#$8000,d1
+	bsr		MATH_makeSins	; A0 = destination, sinus word array ptr, D0 = destination depth (length = 2^depth), D1 = phase [-32768,32768[ : [-PI/2,PI/2[, use -32768 for Sinus, use 0 for Cosinus
+
+	lea		sin,a0
+	move.w		#$3fff,d1
+	move.w		#1024-1,d7
+.crt:
+	move.w		(a0),d0
+	muls		d1,d0
+	swap		d0
+	move.w		d0,(a0)+
+	dbra		d7,.crt
+
+uu:
+	lea		sin,a0
+	lea		sins,a1
+	move.w		#256-1,d7
+.sin:
+	moveq		#0,d0
+	move.w		(a0),d1	
+	move.l		a1,a2
+	moveq		#END_FRAME_COUNT-1,d6
+.scl:
+	move.w		d0,d2
+	asr.w		#6,d2
+	and.w		#$fffc,d2
+	move.w		d2,(a2)
+	add.w		d1,d0
+	lea		4*256(a2),a2
+	dbra		d6,.scl
+
+	addq.w		#8,a0
+	addq.l		#4,a1
+	dbra		d7,.sin
+
+	lea		sins,a1
+	moveq		#END_FRAME_COUNT-1,d7
+.cos:
+	lea		4*64(a1),a2
+	lea		2(a1),a3
+	move.w		#256-64-1,d6
+.cpy0:
+	move.w		(a2),d0
+	asr.w		#1,d0
+	move.w		d0,(a3)
+	addq.l		#4,a2
+	addq.l		#4,a3
+	dbra		d6,.cpy0
+
+	move.l		a1,a2
+	move.w		#64-1,d6
+.cpy1:
+	move.w		(a2),d0
+	asr.w		#1,d0
+	move.w		d0,(a3)
+	addq.l		#4,a2
+	addq.l		#4,a3
+	dbra		d6,.cpy1
+
+	lea		4*256(a1),a1
+
+	dbra		d7,.cos
+
+	move.l		#frames,END_CurFrame
+	rts
+
+;-----------------------------------------------
+END_init2:
 	lea		sin,a0
 	moveq		#10,d0
 	move.l		#$8000,d1
@@ -164,6 +235,112 @@ END_calcAllDots:
 	sub.l		a4,a4
 
 	move.w		#END_IMG_WIDTH-1,d0
+.xloop:
+	moveq		#END_IMG_HEIGHT-1,d1
+.yloop:
+	move.l		a3,a0
+	move.w		a4,d2
+	;sub.w		#6,a4
+	sub.w		#12,a4
+
+	bsr		END_calcOneDot	; D0 = x, D1 = y, D2 = alpha, A0 = dest, A1 = wxs, A2 = rowsptr
+
+	dbra		d1,.yloop
+
+	;add.w		#64,a4
+	add.w		#128,a4
+;uu:
+	dbra		d0,.xloop
+
+	rts
+
+;-----------------------------------------------
+		rsreset
+_END_DotX:	rs.w	0
+_END_DotY:	rs.w	0
+_END_DotAlpha:	rs.w	0
+
+
+;-----------------------------------------------
+END_calcIterDot:	; a6 = DotStruct
+	lea		END_Wxs+WSCREEN*4,a1
+	lea		END_RowsOfs+HSCREEN*2,a2
+	lea		frames+HSCREEN*40*(END_FRAME_COUNT-1),a0
+	movem.w		(a6)+,d0-d2
+
+
+;-----------------------------------------------
+END_calcOneDot:		; D0 = x, D1 = y, D2 = alpha, A0 = dest, A1 = wxs, A2 = rowsptr
+
+	lea		sins,a6
+
+	BGC		$0f0
+
+	movem.l		d0-d1/a3-a4,-(sp)
+
+	move.w		#$3fc,d6
+	lea		4*256.w,a3
+	lea		-HSCREEN*40,a4
+
+	add.w		#WSCREEN/2-END_IMG_WIDTH/2,d0
+	add.w		d0,d0
+	add.w		d0,d0
+	add.w		#HSCREEN/2-END_IMG_HEIGHT/2,d1
+	add.w		d1,d1
+;	moveq		#END_FRAME_COUNT-1,d6
+.floop:
+	rept		END_FRAME_COUNT
+;	move.w		d0,d4		; x
+;	and.w		#$1fe,d2	; alpha [0..510]
+;	add.w		(a6,d2.w),d4	; x += sins[alpha]
+;	move.w		d1,d5		; y
+;	move.w		d2,d3		; beta
+;	add.w		#64*2,d3	; beta += PI/4
+;	and.w		#$1fe,d3	; beta [0..510]
+;	add.w		(a6,d3.w),d5	; y += cos[beta]
+
+;	and.w		#$3fc,d2	; alpha [0..510]
+	and.w		d6,d2		; alpha [0..510]
+	movem.w		(a6,d2.w),d4-d5	; x += sins[alpha]
+	add.w		d0,d4
+	add.w		d1,d5
+
+;	add.w		d4,d4
+;	add.w		d4,d4		; x *= 4
+;	add.w		d5,d5		; y *= 2
+
+	movem.w		(a1,d4.w),d3-d4	; col_ofs, mask
+	add.w		(a2,d5.w),d3	; col_ofs += row_ofs
+	or.w		d4,(a0,d3.w)	; 
+
+	;lea		2*1024/4(a6),a6
+	;lea		4*256(a6),a6
+	;lea		-HSCREEN*40(a0),a0	; 
+	add.l		a3,a6
+	add.l		a4,a0
+
+	;add.w		#2,d2		; alpha+=2
+	addq.w		#4,d2		; alpha+=2
+
+;	dbra		d6,.floop
+	endr
+
+	movem.l		(sp)+,d0-d1/a3-a4
+	;sub.w		#WSCREEN/2-END_IMG_WIDTH/2,d0
+	;sub.w		#HSCREEN/2-END_IMG_HEIGHT/2,d1
+
+	BGC		$000
+
+	rts
+
+;-----------------------------------------------
+END_calcAllDots2:
+	lea		END_Wxs+WSCREEN*4,a1
+	lea		END_RowsOfs+HSCREEN*2,a2
+	lea		frames+HSCREEN*40*(END_FRAME_COUNT-1),a3
+	sub.l		a4,a4
+
+	move.w		#END_IMG_WIDTH-1,d0
 xloop:
 	moveq		#END_IMG_HEIGHT-1,d1
 yloop:
@@ -182,7 +359,10 @@ yloop:
 	rts
 
 ;-----------------------------------------------
-END_calcOneDot:		; D0 = x, D1 = y, D2 = alpha, A0 = dest, A1 = wxs, A2 = rowsptr
+END_calcOneDot2:		; D0 = x, D1 = y, D2 = alpha, A0 = dest, A1 = wxs, A2 = rowsptr
+
+	BGC		$0f0
+
 	lea		sins,a6
 
 	add.w		#WSCREEN/2-END_IMG_WIDTH/2,d0
@@ -190,7 +370,8 @@ END_calcOneDot:		; D0 = x, D1 = y, D2 = alpha, A0 = dest, A1 = wxs, A2 = rowsptr
 	moveq		#END_FRAME_COUNT-1,d6
 
 ;	lea		4*2*1024/4(a6),a6
-uu:
+;uu:
+
 .floop:
 	move.w		d0,d4		; x
 	and.w		#$1fe,d2	; alpha [0..510]
@@ -217,6 +398,8 @@ uu:
 
 	sub.w		#WSCREEN/2-END_IMG_WIDTH/2,d0
 	sub.w		#HSCREEN/2-END_IMG_HEIGHT/2,d1
+
+	BGC		$000
 
 	rts
 
@@ -269,8 +452,7 @@ vv:
 
 ;-----------------------------------------------
 END_createMasks:
-
-	lea		logo+IMG_Struct_Size,a0
+	lea		END_Logo+IMG_Struct_Size,a0
 	lea		END_Masks,a1
 	move.w		#END_IMG_WIDTH*END_IMG_HEIGHT/16-1,d7
 .loop:
@@ -284,9 +466,9 @@ END_createMasks:
 	add.b		d2,d2
 	addx.w		d3,d3
 	dbra		d6,.wloop
-	move.w		d3,(a0)+
-
+	move.w		d3,(a1)+
 	dbra		d7,.loop
+
 	rts
 
 ;-----------------------------------------------
@@ -315,7 +497,7 @@ END_RowsOfs:	ds.w	HSCREEN*3
 
 sin:
 frames:		ds.b	40*200*END_FRAME_COUNT
-sins:		ds.w	64*1024/4
+sins:		ds.b	4*256*64
 
 buffers:	ds.b	65536
 
