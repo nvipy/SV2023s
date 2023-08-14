@@ -16,7 +16,7 @@ run:
 
 	dc.l		$a000a00a              ;Mouse off
 	bsr		SetSuper
-	;bsr		StopMFP
+	bsr		StopMFP
 	bsr		SaveScreen
 
 	move.l		#buffers,d0
@@ -47,14 +47,17 @@ mainloop:
 
 	bsr		ResetVbl
 	move.w 		#$700,$ffff8240.w
-	bsr		RestoreHbl	; use a4,a5
-	move.w 		#$70,$ffff8240.w
+
+	bsr		BIOS_WaitVbl
 	bsr		RestoreScreen
 	move.w 		#$7,$ffff8240.w
-	;bsr		RestoreMFP
+	bsr		BIOS_WaitVbl
+	bsr		RestoreMFP
 	move.w 		#$fff,$ffff8240.w
+	bsr		BIOS_WaitVbl
 	bsr		SetUser
 	dc.l		$a000a009               ;Mouse on
+	bsr		BIOS_WaitVbl
 	clr.l		-(a7)
 	trap		#1
 
@@ -95,18 +98,18 @@ SeqWaitIntro:
 
 		TASK_MAKE	NULL,TASK_while,TASK_MAX_DURATION,0
 
-		TASK_MAKE	initfader12,NULL,TASK_MAX_DURATION,0
-		TASK_MAKE	fader,NULL,TASK_MAX_DURATION,0
-		TASK_MAKE	initfader20,NULL,TASK_MAX_DURATION,0
-		TASK_MAKE	fader,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	deadTime,initfader12,TASK_MAX_DURATION,0
+		TASK_MAKE	deadTime,fader,TASK_MAX_DURATION,0
+		TASK_MAKE	deadTime,initfader20,TASK_MAX_DURATION,0
+		TASK_MAKE	deadTime,fader,TASK_MAX_DURATION,0
 
 		TASK_MAKE	initRTZScreen,NULL,TASK_MAX_DURATION,0
 
-		TASK_MAKE	NULL,NULL,25,0
+		TASK_MAKE	deadTime,NULL,50,0
 
-		TASK_MAKE	playAudio,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	deadTime,playAudio,TASK_MAX_DURATION,0
 		TASK_MAKE	playOpenRTZ,RTZ_vbl,TASK_MAX_DURATION,0
-		TASK_MAKE	playRTZ,RTZ_vbl,25*60,0
+		TASK_MAKE	playRTZ,RTZ_vbl,25*100,0
 		TASK_MAKE	playCloseRTZ,RTZ_vbl,TASK_MAX_DURATION,0
 
 		TASK_MAKE	END_iter,NULL,TASK_MAX_DURATION,0
@@ -140,7 +143,7 @@ TASK_while:
 	TASK_NEXT
 	rts
 .end:
-vv:
+;vv:
 	TASK_NEXT
 	rts
 
@@ -153,6 +156,16 @@ initAll:
 	bsr		initRTZ
 uu:
 	clr.w		TASK_WhileValue
+	rts
+
+;-----------------------------------------------
+deadTime:
+;	BGC		$000
+	rept		9
+;	addq.w		#1,$ffff8240.w
+	bsr		END_calcIterDot
+	endr
+;	BGC		$0f0
 	rts
 
 ;**********************************************************************
@@ -330,7 +343,19 @@ initRTZ:
 	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YClr
 	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YScroll
 
+	move.w		#480-1,d7
+.iter:
+;	addq.w		#1,$ffff8240.w
+	bsr		END_calcIterDot
+	tst.w		END_Dot
+	bne.s		.enditer
+	dbra		d7,.iter
+.enditer	
+;	BGC		$f00
+
+
 	rts
+
 
 ;---------------------------------------------------------
 playAudio:
@@ -375,6 +400,8 @@ playOpenRTZ:
 
 ;---------------------------------------------------------
 playRTZ:
+	BGC		$000
+
 	move.w		zoomOfs,d0
 	and.w		#4095,d0
 	lea		cos,a0
@@ -396,12 +423,21 @@ playRTZ:
 	addq.w		#4,alpha
 	and.w		#$ffc,alpha
 
+
+	;BGC		$f00
 .wait2vbl:
+;	addq.w		#1,$ffff8240.w
+	bsr		END_calcIterDot
+
 	move.w		VblStrobe,d0
 	subq.w		#2,d0
 	bmi.s		.wait2vbl
 
 	bsr		SwapSTEBuffers
+
+	;BGC		$0f0
+	bsr		END_calcIterDot
+	;BGC		$000
 
 	rts
 
@@ -818,7 +854,7 @@ Hx:		dc.b	0,0
 ;**********************************************************************
 
 ;-----------------------------------------------
-END_FRAME_COUNT	=	64; 128
+END_FRAME_COUNT	=	128
 END_IMG_WIDTH	=	192
 END_IMG_HEIGHT	=	80
 
@@ -829,7 +865,7 @@ END_iter:
 ;	bsr		SetColors
 ;uu:
 .iter:
-	addq.w		#1,$ffff8240.w
+	;addq.w		#1,$ffff8240.w
 	bsr		END_calcIterDot
 	tst.w		END_Dot
 	beq.s		.iter
@@ -1068,7 +1104,6 @@ END_initCosSin:
 
 	rts
 
-
 ;-----------------------------------------------
 END_createPoints:
 	lea		END_Logo+IMG_HStruct_Size+8*2,a0
@@ -1131,7 +1166,7 @@ STD_initPlot:		; A0 = rows, A1 = wxs, D0 = rowcount-1, D1 = width, D2 = row over
 .wxsclr:
 	clr.l		(a2)+
 	dbra		d3,.wxsclr
-	
+
 	lsr.w		#3,d1		; width/8
 	move.w		d1,d3		
 
