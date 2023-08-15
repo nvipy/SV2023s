@@ -77,10 +77,6 @@ Sequence:
 		;TASK_MAKE	initRTZ,initfader01,TASK_MAX_DURATION,0
 		TASK_MAKE	initAll,initfader01,TASK_MAX_DURATION,0
 
-		;TASK_MAKE	END_iter,NULL,TASK_MAX_DURATION,0
-		;TASK_MAKE	END_play,NULL,TASK_MAX_DURATION,0
-		;TASK_MAKE	NULL,NULL,TASK_MAX_DURATION,0
-
 		TASK_MAKE	NULL,fader,TASK_MAX_DURATION,0
 		TASK_MAKE	NULL,NULL,30,0
 		TASK_MAKE	NULL,introLoop,TASK_MAX_DURATION,0
@@ -114,17 +110,33 @@ SeqWaitIntro:
 
 		TASK_MAKE	END_iter,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	END_play,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	END_initLogo,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	END_playLogo,NULL,TASK_MAX_DURATION,0
+
+		TASK_MAKE	NULL,endLoop,TASK_MAX_DURATION,0
+SeqWaitEnd:
+		TASK_MAKE	END_setLightLogo,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	END_playLogo,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	END_setDarkLogo,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	END_playLogo,NULL,TASK_MAX_DURATION,0
+
+		TASK_MAKE	NULL,TASK_while,TASK_MAX_DURATION,0
 
 		TASK_MAKE	NULL,NULL,TASK_MAX_DURATION,0
 SequenceEnd:
-
-
 
 ;------------------------------
 introLoop:
 	bsr		initSound
 
 	lea		SeqWaitIntro,a0
+	bsr		TASK_do
+	TASK_NEXT
+	rts  
+
+;------------------------------
+endLoop:
+	lea		SeqWaitEnd,a0
 	bsr		TASK_do
 	TASK_NEXT
 	rts  
@@ -858,11 +870,78 @@ END_FRAME_COUNT	=	128
 END_IMG_WIDTH	=	192
 END_IMG_HEIGHT	=	80
 
+;-----------------------------------------------
+END_initLogo:
+
+	lea		END_Frames,a0
+	bsr		ClearScreenSTEBuffer
+
+	move.w		#WSCREEN_PLAN_WORDS,d0
+	move.w		#HSCREEN,d1
+	move.w		#IMG_CENTER,d2		; little bug
+	lea		END_Logo,a0
+	lea		END_Frames,a1
+	lea		45*160(a1),a1
+	lea		END_LogoXImgStruct,a6
+	bsr		IMG_get4Bits		; d0 = dest word width, d1 = dest height, d2 = flag, a0 = image data, a1 = screens destinations, a6: image struct
+
+	move.l		#END_Frames,d0
+	bsr		SetScreenAdrsSTE	;D0 = screen adrs
+
+	WAIT_VBL
+
+	lea		cmapBaseLogo,a0
+	bsr		SetColors
+
+	moveq		#0,d0
+	lea		cmapBaseLogo,a0
+	lea		cmapLogo,a1
+	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
+	;ShadePal:		; a4 = dest,  Return d0: d0=0 continue, d0=-1 end
+
+	TASK_NEXT
+
+	rts
+
+;-----------------------------------------------
+END_playLogo:
+	lea		$ffff8240.w,a4
+	bsr		ShadePal		; a4 = dest,  Return d0: d0=0 continue, d0=-1 end
+	tst.w		d0
+	beq.s		.next
+	TASK_NEXT
+.next
+	rts
+
+;-----------------------------------------------
+END_setLightLogo:
+	moveq		#2,d0
+	lea		cmapLogo,a0
+	lea		cmaplightLogo,a1
+	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
+	TASK_NEXT
+	rts
+
+;-----------------------------------------------
+END_setDarkLogo:
+	moveq		#2,d0
+	lea		cmaplightLogo,a0
+	lea		cmapLogo,a1
+	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
+	TASK_NEXT
+	rts
+	
+
+;-----------------------------------------------
+cmapBaseLogo:	dc.w	0,0,0,0,0,$fff,$fff,$fff
+cmapLogo:	dc.w	0,$222,$444,$666,$888,$aaa,$ccc,$eee
+cmaplightLogo:	dc.w	$002,$77a,$99b,$bbc,$ccd,$dde,$eef,$fff
+
 
 ;-----------------------------------------------
 END_iter:
-;	lea		cmapBlack,a0
-;	bsr		SetColors
+	lea		cmapBlack,a0
+	bsr		SetColors
 ;uu:
 .iter:
 	;addq.w		#1,$ffff8240.w
@@ -880,6 +959,15 @@ END_iter:
 	move.l		frontBuf,a0
 	bsr		ClearScreenSTEBuffer
 
+	lea		END_Frames,a0
+	bsr		END_draw		; a0 = buffer
+	bsr		SwapSTEBuffers
+	lea		END_Frames,a0
+	bsr		END_draw		; a0 = buffer
+	bsr		SwapSTEBuffers
+
+
+	WAIT_VBL
 	lea		cmapRTZ,a0
 	bsr		SetColors
 
@@ -1567,11 +1655,11 @@ cmapBlack:	dc.w	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 cmapWhite:	dc.w	$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff
 cmapLigth:	dc.w	$300,$410,$520,$630,$740,$852,$974,$a96,$aa8,$bb9,$cca,$eeb,$ffc,$ffd,$ffe,$fff
 
-font:		incbin	"data/rtz.pft"
-rzimg:		incbin	"data/rzimg.dta"
+END_Logo:	incbin	"data/ngc.img"
 title		incbin	"data/title.img"
 music:		incbin	"data/music.xdp"
-END_Logo:	incbin	"data/ngc.img"
+font:		incbin	"data/rtz.pft"
+rzimg:		incbin	"data/rzimg.dta"
 
 musicend:
 
@@ -1644,7 +1732,7 @@ END_RowsOfs:		ds.w	HSCREEN*3
 
 sins:			ds.b	4*256*END_FRAME_COUNT
 
-END_LogoImgSt:		ds.b	IMG_Struct_Size
+END_LogoXImgStruct:	ds.b	IMG_Struct_Size
 END_Points:		ds.l	END_IMG_WIDTH*END_IMG_HEIGHT
 
 END_Frames:		ds.b	40*200*END_FRAME_COUNT
