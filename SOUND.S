@@ -1,9 +1,9 @@
 DELAY_BETWEEN_NOTES = 8
-NOTES_TONE_INTERVAL = 128
+NOTES_TONE_INTERVAL = 160; 128
 CHORD_START			 = 20
 SNDFADEOUT 			= 290
 STOP_NOISE			= 32*8
-END_FADEOUT		    = 100
+END_FADEOUT		    = 90
 
 initSound:
     move.w     #7,(a0)
@@ -136,7 +136,8 @@ END_updateSound:
 	move.w     d2,framecnt(a2)
 
 	move.w		d2,d0
-	add.w		#10,d0
+	lsr.w		#1,d0
+	add.w		#20,d0
 	cmp.w	   #40,d0
 	bge.b	   .doneRampUp
 	bsr		AUD_setVolume
@@ -198,6 +199,21 @@ LOGO_initSound:
 	move.w	   #-2,prevNoteChan(a2)
 	move.w     #0,framecnt(a2)
 
+	move.w	   chanAFreq(a2),d0
+	sub.w	   #20000,d0		; base note
+	neg.w	   d0
+	move.w	   d0,d1
+	lsr.w	   #8,d1
+	moveq	   #0,d2
+	move.w	   #2,d7
+.lp:	
+	move.b     d2,(a0)            ; select channel - LOW
+	move.b     d0,(a1) 			  ; freq low
+	addq.w	   #1,d2
+	move.b     d2,(a0)            ; select channel - HI
+	move.b     d1,(a1)    		  ; freq hi
+	dbra	   d7,.lp
+
 	moveq	#40,d0
 	bsr		AUD_setVolume
 	rts
@@ -220,7 +236,7 @@ LOGO_updateSound:
 	bsr		AUD_setVolume
 .notfinished:
 
-	move.w	#NOTES_TONE_INTERVAL+100,d6
+	move.w	#NOTES_TONE_INTERVAL+64,d6
 	move.w	#DELAY_BETWEEN_NOTES*5,d7
 	bsr		LOGO_updateSoundLand
 	rts
