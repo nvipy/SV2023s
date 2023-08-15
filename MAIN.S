@@ -10,8 +10,8 @@
 	include		"INCLUDES/IMG.I"
 	include		"INCLUDES/TASKMAN.I"
 	include		"INCLUDES/PROPFONT.I"
- 
-	section	text
+ 	include		"SOUND.S"
+
 run:
 
 	dc.l		$a000a00a              ;Mouse off
@@ -1281,98 +1281,6 @@ STD_initPlot:		; A0 = rows, A1 = wxs, D0 = rowcount-1, D1 = width, D2 = row over
 
 
 
-;**********************************************************************
-;
-;		AUDIO
-;
-;**********************************************************************
-
-initSound:
-    ; init sound
-    lea        $ffff8800,a0
-    lea        2(a0),a1
-    lea        soundvars,a2
-
-    moveq      #7,d0
-    move.w     d0,(a0)
-    move.b     (a0),4(a2)         ; sndRegSav
-
-    move.w     d0,(a2)
-    clr.w      2(a2)           ; framecnt
-
-    clr.b      (a0)            ; channel A freq low
-    move.b     #%1000000,(a1)     ; freq low
-    move.b     #1,(a0)            ; channel A freq hi
-    move.b     #%10011100,(a1)    ; freq hi
-
-    move.b     #11,(a0)           ; volume over time LOW
-    move.b     #%1100,(a1)        ; volume over time
-    move.b     #12,(a0)           ; volume over time HI
-    move.b     #%1,(a1)           ; volume over time
-
-    move.b     #13,(a0)           ; envelope
-    move.b     #%1010,(a1)        ; sine
-
-    move.b     #6,(a0)            ; NOISE
-    move.b     #100,(a1)
-
-    move.b     d0,(a0)            ; access Yamaha register 7
-    move.b     #%111110,(a1)    ; turn on channel A, no noise
-
-    move.b     #8,(a0)            ; channel A volume
-    clr.b      (a1)
-
-    rts
-
-SNDFADEOUT = 140
-
-updateSound:
-        lea        soundvars,a2
-	    lea        $ffff8800,a0
-	    lea        2(a0),a1
-		moveq		#12,d3
-
-        ; RAMP UP VOLUME
-        move.w     2(a2),d2
-        addq.w     #1,d2
-        move.w     d2,2(a2)
-		cmp.w	   #SNDFADEOUT,d2 ; fade out
-		bge.b	   fadeout
-        lsr.w      #4,d2
-        addq.w     #4,d2 ; start volume
-        cmp.w      d3,d2
-        ble.b      noclampvol
-        move.w     d3,d2
-		bra.s	   noclampvol
-fadeout:
-	;	move.b     #6,(a0)            ; NOISE
-	;	move.b     d2,(a1)
-
-		sub.w		#SNDFADEOUT,d2
-		lsr.w		#1,d2
-		sub.w		d3,d2
-		bge.b		zerosnd
-		neg.w		d2
-		bra.b		noclampvol
-zerosnd:
-	    moveq		#0,d2		
-noclampvol:
-        move.b     #8,(a0)            ; channel A volume
-        move.b     d2,(a1)
-
-        move.w     (a2),d0
-        addq.w     #1,d0
-        move.w     d0,(a2)
-        and.w      #31,d0
-        move.w     #%110110,d1         ; channel A + noise
-        cmp.w      #8,d0
-        ble.b      .donoise
-        move.b     #%111110,d1       ; clear noise
-.donoise
-        move.b     #7,(a0)            ; access Yamaha register 7
-        move.b     d1,(a1)            ; turn on channel A
-
-        rts
 
 ;------------------------------------------------------------------------------
 ; create Diff.Indice table
@@ -1666,12 +1574,13 @@ musicend:
 MUSIC_LENGTH	=	musicend-music
 
 text:			dc.b	""
-			dc.b	"LADY MACBETH They met me in the day of success: and I have "
-			dc.b	"learned by the perfectest report, they have more in "
-			dc.b	"them than mortal knowledge. When I burned in desire "
-			dc.b	"to question them further, they made themselves air, "
-			dc.b	"into which they vanished. Whiles I stood rapt in "
-			dc.b	"the wonder of it, came missives from the king, who "
+			dc.b	"                                                             "
+			dc.b	"NGC salutes the Atari community with this little compo filler. "
+			dc.b	"Code and GFX by Viper - Original music by Jester of Sanity "
+			dc.b	"(tortured to elevator jazz by Soundy). "
+			dc.b	"Greets to: Leonard, MajorX, Gadget, Dan, Dascon, Virgill, "
+			dc.b	"Facet, Erk, Made, Prowler, NoRecess, Merry, Platon42, Rez, Ok3nos, "
+			dc.b	"ntsc_, hugs go to TRSI, we'll miss Spotter"
 			dc.b	"all-hailed me 'Thane of Cawdor' by which title, "
 			dc.b	"before, these weird sisters saluted me, and referred "
 			dc.b	"me to the coming on of time, with 'Hail, king that "
@@ -1700,13 +1609,10 @@ textEnd:		even
 
 ;---------------------------------------------------------
                 section bss
-soundvars:
-noise     ds.w       1
-framecnt  ds.w       1
-sndRegSav ds.w       1 
+                even
 
-;-----------------------------------------------
-;                section bss
+
+soundvars: ds.b       sndStruct_len
 
 
 textImg:		ds.b	2048*8
