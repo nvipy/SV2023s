@@ -5,6 +5,9 @@ SNDFADEOUT 			= 290
 STOP_NOISE			= 32*8
 
 initSound:
+    move.w     #7,(a0)
+    move.b     (a0),sndRegSav+soundvars
+initSoundEnd:
     ; init sound
     lea        $ffff8800,a0
     lea        2(a0),a1
@@ -12,8 +15,6 @@ initSound:
 
 	move.w	   #-2,prevNoteChan(a2)
     moveq      #7,d0
-    move.w     d0,(a0)
-    move.b     (a0),sndRegSav(a2)
 	clr.w	   chanAFreq(a2)
 	clr.w	   noteCnter(a2)
 
@@ -107,7 +108,8 @@ noclampvol:
 
 
 END_initSound:
-	bsr		   initSound
+	clr.b		$ffff8901.w	; AUD STOP
+	bsr		   initSoundEnd
 
     move.b     #8,(a0)            ; channel A volume
     clr.b      (a1)
@@ -119,17 +121,24 @@ END_initSound:
 
 
 END_updateSound:
-	moveq		#40,d0
-	bsr		AUD_setVolume
-	clr.b		$ffff8901.w	; AUD STOP
 
 	lea        soundvars,a2
 	lea        $ffff8800,a0
 	lea        2(a0),a1
 
+	movem.l	   a0-a2,-(sp)
+
 	move.w     framecnt(a2),d2
 	addq.w     #1,d2
 	move.w     d2,framecnt(a2)
+
+	move.w		d2,d0
+	add.w		#10,d0
+	cmp.w	   #40,d0
+	bge.b	   .doneRampUp
+	bsr		AUD_setVolume
+.doneRampUp:
+	movem.l	   (sp)+,a0-a2
 
 	move.w	   chanAFreq(a2),d0
 ;	and.w	   #4095,d0				; notes wrapping		

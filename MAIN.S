@@ -983,6 +983,7 @@ END_iter:
 	lea		cmapRTZ,a0
 	bsr		SetColors
 
+	bsr		END_initSound
 	TASK_NEXT
 
 	rts
@@ -1022,7 +1023,6 @@ END_initPlay:
 	clr.l		(a1)
 
 	move.l		#END_FramePtrs,END_FramePtr
-	bsr		END_initSound
 
 	rts
 
