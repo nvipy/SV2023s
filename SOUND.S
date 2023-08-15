@@ -1,8 +1,9 @@
-DELAY_BETWEEN_NOTES1 = 8
+DELAY_BETWEEN_NOTES = 8
 NOTES_TONE_INTERVAL = 128
 CHORD_START			 = 20
 SNDFADEOUT 			= 290
 STOP_NOISE			= 32*8
+END_FADEOUT		    = 100
 
 initSound:
     move.w     #7,(a0)
@@ -120,6 +121,8 @@ END_initSound:
 	rts
 
 
+; d6 = NOTES_TONE_INTERVAL
+; d7 = DELAY_BETWEEN_NOTES
 END_updateSound:
 
 	lea        soundvars,a2
@@ -140,12 +143,13 @@ END_updateSound:
 .doneRampUp:
 	movem.l	   (sp)+,a0-a2
 
+LOGO_updateSoundLand:
 	move.w	   chanAFreq(a2),d0
 ;	and.w	   #4095,d0				; notes wrapping		
 	move.w	   noteCnter(a2),d1
 	bne.b	   notnewnote
-	add.w	   #NOTES_TONE_INTERVAL,d0
-	move.w	   #DELAY_BETWEEN_NOTES1,d1
+	add.w	   d6,d0
+	move.w	   d7,d1
 
 	move.w	   d0,chanAFreq(a2)
 	sub.w	   #20000,d0		; base note
@@ -187,6 +191,38 @@ EXIT_sound:
 	moveq		#%111111,d0
 	or.b		soundvars+sndRegSav,d0
 	move.b		d0,$ffff8802.w    ; switch off all sound & noise channels, restore original PORT values
+	rts
+
+LOGO_initSound:
+	lea		  soundvars,a2
+	move.w	   #-2,prevNoteChan(a2)
+	move.w     #0,framecnt(a2)
+
+	moveq	#40,d0
+	bsr		AUD_setVolume
+	rts
+
+LOGO_updateSound:
+	lea        soundvars,a2
+	lea        $ffff8800,a0
+	lea        2(a0),a1
+	move.w     framecnt(a2),d2
+	addq.w     #1,d2
+	move.w     d2,framecnt(a2)
+	move.w	framecnt(a2),d0
+	cmp.w   #END_FADEOUT,d0
+	ble.b	.notfinished
+	sub.w	#END_FADEOUT,d0
+	lsr.w	#4,d0
+	sub.w	#40,d0
+	neg.w	d0
+	ble.b   .notfinished
+	bsr		AUD_setVolume
+.notfinished:
+
+	move.w	#NOTES_TONE_INTERVAL+100,d6
+	move.w	#DELAY_BETWEEN_NOTES*5,d7
+	bsr		LOGO_updateSoundLand
 	rts
 
 sndStruct
