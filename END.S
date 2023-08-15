@@ -76,7 +76,6 @@ END_IMG_HEIGHT	=	80
 
 ;-----------------------------------------------
 END_init:
-	bsr		END_initSound
 	bsr		END_initCosSin
 	bsr		END_createPoints
 
@@ -92,6 +91,7 @@ END_init:
 	bsr		END_initPlay
 
 	bsr		END_initIterDot
+	bsr		END_initSound
 
 	lea		cmapRTZ,a0
 	bsr		SetColors
@@ -121,7 +121,6 @@ END_FramePtrs:	ds.l	END_FRAME_COUNT+16
 
 ;-----------------------------------------------
 END_play:
-	bsr			END_updateSound
 	move.l		END_FramePtr,a1
 	move.l		(a1)+,a0
 	move.l		a0,d0
@@ -132,6 +131,7 @@ END_play:
 	subq.l		#2,backBuf
 	bsr		END_draw
 	bsr		SwapSTEBuffers
+	bsr			END_updateSound
 	rts
 
 ;-----------------------------------------------

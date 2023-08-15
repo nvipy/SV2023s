@@ -1001,7 +1001,6 @@ END_init:
 	bsr		END_initPlay
 
 	bsr		END_initIterDot
-	bsr		END_initSound
 
 	rts
 
@@ -1020,6 +1019,7 @@ END_initPlay:
 	clr.l		(a1)
 
 	move.l		#END_FramePtrs,END_FramePtr
+	bsr		END_initSound
 
 	rts
 
