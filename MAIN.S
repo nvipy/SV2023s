@@ -44,7 +44,6 @@ mainloop:
 	bne.s		mainloop
 
 	bsr		AUD_stop
-
 	bsr		ResetVbl
 	move.w 		#$700,$ffff8240.w
 
@@ -380,11 +379,7 @@ playAudio:
 
 ;---------------------------------------------------------
 initRTZScreen:
-	move.b		#7,$ffff8800.w
-	moveq		#%111111,d0
-	or.b		sndRegSav,d0
-	move.b		d0,$ffff8802.w    ; switch off all sound & noise channels, restore original PORT values
-
+	bsr		EXIT_sound
 	bsr		ClearAllScreenSTEBuffer
 	lea		cmapRTZ,a0
 	bsr		SetColors	; a0 = palette ptr  
@@ -992,6 +987,7 @@ END_init:
 	bsr		END_initPlay
 
 	bsr		END_initIterDot
+	bsr		END_initSound
 
 	rts
 
@@ -1033,6 +1029,7 @@ END_play:
 	subq.l		#2,backBuf
 	bsr		END_draw
 	bsr		SwapSTEBuffers
+	bsr		END_updateSound
 	rts
 
 ;-----------------------------------------------
@@ -1548,11 +1545,6 @@ AUD_play:
 
 		move.b		#1,$21(a0) 		; freq, mono/stereo
 		move.b		#3,1(a0)
-		rts
-
-;-----------------------------------------------
-AUD_stop:
-		clr.b		$ffff8901.w
 		rts
 
 ;-----------------------------------------------

@@ -95,27 +95,8 @@ noclampvol:
 
 
 END_initSound:
-    lea        $ffff8800,a0
-    lea        2(a0),a1
-    lea        soundvars,a2
+	bsr		   initSound
 
-	; ---- TO DO : DEBUT DE BLOC INUTILE POUR LE FINAL (déjà fait dans initSound)
-    move.b     #11,(a0)           ; volume over time LOW
-    move.b     #%1100,(a1)        ; volume over time
-    move.b     #12,(a0)           ; volume over time HI
-    move.b     #%1,(a1)           ; volume over time
-
-    move.b     #13,(a0)           ; envelope
-    move.b     #%1010,(a1)        ; sine
-
-    move.b     #6,(a0)            ; NOISE
-    move.b     #100,(a1)
-
-    move.b     d0,(a0)            ; access Yamaha register 7
-    move.b     #%111110,(a1)    ; turn on channel A, no noise
-
-    move.b     #8,(a0)            ; channel A volume
-    clr.b      (a1)
 	rts
 
 END_updateSound:
@@ -154,6 +135,14 @@ notnewnote:
 
 	rts
 
+AUD_stop:
+	clr.b		$ffff8901.w	; AUD STOP
+EXIT_sound:
+	move.b		#7,$ffff8800.w
+	moveq		#%111111,d0
+	or.b		soundvars+sndRegSav,d0
+	move.b		d0,$ffff8802.w    ; switch off all sound & noise channels, restore original PORT values
+	rts
 
 sndStruct
 noise     rs.w       1
