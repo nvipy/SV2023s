@@ -7,6 +7,9 @@
 	include		"INCLUDES/SYS.I"
 	include		"INCLUDES/MATH.I"
 	include		"INCLUDES/IMG.I"
+	include		"SOUND.S"
+
+
  
 run:
 
@@ -73,6 +76,7 @@ END_IMG_HEIGHT	=	80
 
 ;-----------------------------------------------
 END_init:
+	bsr		END_initSound
 	bsr		END_initCosSin
 	bsr		END_createPoints
 
@@ -117,6 +121,7 @@ END_FramePtrs:	ds.l	END_FRAME_COUNT+16
 
 ;-----------------------------------------------
 END_play:
+	bsr			END_updateSound
 	move.l		END_FramePtr,a1
 	move.l		(a1)+,a0
 	move.l		a0,d0
@@ -396,5 +401,8 @@ END_Frames:	ds.b	40*200*END_FRAME_COUNT
 
 		ds.b	16384
 buffers:	ds.b	65536
+
+; !!!!!!!!!! DEJA FAIT DANS MAIN.S, A SUPPRIMER LORS DE l'INTEGRATION!!!!!
+soundvars: ds.b       sndStruct_len
 
 
