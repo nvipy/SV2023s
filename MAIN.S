@@ -198,6 +198,9 @@ deadTime:
 ;		INTRO
 ;
 ;**********************************************************************
+
+INTRO_ITER_COUNT	=	2100; 480+1000
+
 ;-----------------------------------------------
 
 initTitle:
@@ -368,7 +371,7 @@ initRTZ:
 	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YClr
 	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YScroll
 
-	move.w		#480-1,d7
+	move.w		#INTRO_ITER_COUNT-1,d7
 .iter:
 ;	addq.w		#1,$ffff8240.w
 	bsr		END_calcIterDot
