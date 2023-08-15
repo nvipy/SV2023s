@@ -91,7 +91,8 @@ SeqWaitIntro:
 
 		TASK_MAKE	NULL,NULL,30,0
 
-		TASK_MAKE	NULL,TASK_while,TASK_MAX_DURATION,0
+		;TASK_MAKE	NULL,TASK_while,TASK_MAX_DURATION,0
+		TASK_MAKE	NULL,TASK_for,TASK_MAX_DURATION,0
 
 		TASK_MAKE	deadTime,initfader12,TASK_MAX_DURATION,0
 		TASK_MAKE	deadTime,fader,TASK_MAX_DURATION,0
@@ -112,14 +113,14 @@ SeqWaitIntro:
 		TASK_MAKE	END_initLogo,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	END_playLogo,NULL,TASK_MAX_DURATION,0
 
-		TASK_MAKE	NULL,endLoop,TASK_MAX_DURATION,0
+		TASK_MAKE	endLoop,NULL,TASK_MAX_DURATION,0
 SeqWaitEnd:
 		TASK_MAKE	END_setLightLogo,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	END_playLogo,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	END_setDarkLogo,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	END_playLogo,NULL,TASK_MAX_DURATION,0
 
-		TASK_MAKE	NULL,TASK_while,TASK_MAX_DURATION,0
+		TASK_MAKE	TASK_while,NULL,TASK_MAX_DURATION,0
 
 		TASK_MAKE	NULL,NULL,TASK_MAX_DURATION,0
 SequenceEnd:
@@ -129,6 +130,7 @@ introLoop:
 	bsr		initSound
 
 	lea		SeqWaitIntro,a0
+	moveq		#3,d0
 	bsr		TASK_do
 	TASK_NEXT
 	rts  
@@ -136,6 +138,7 @@ introLoop:
 ;------------------------------
 endLoop:
 	lea		SeqWaitEnd,a0
+	moveq		#-1,d0
 	bsr		TASK_do
 	TASK_NEXT
 	rts  
@@ -143,7 +146,7 @@ endLoop:
 ;------------------------------
 TASK_do:
 	move.l		a0,TASK_WhilePoint
-	move.w		#1,TASK_WhileValue
+	move.w		d0,TASK_WhileValue
 	rts
 
 ;------------------------------
@@ -154,10 +157,21 @@ TASK_while:
 	TASK_NEXT
 	rts
 .end:
-;vv:
 	TASK_NEXT
 	rts
 
+;------------------------------
+TASK_for:
+	subq.w		#1,TASK_WhileValue
+	blt.s		.end
+	move.l		TASK_WhilePoint,TASK_SeqPtr
+	TASK_NEXT
+	rts
+.end:
+	TASK_NEXT
+	rts
+
+;------------------------------
 TASK_WhilePoint:	dc.l	0
 TASK_WhileValue:	dc.w	0
 
@@ -166,7 +180,7 @@ initAll:
 	bsr		END_init
 	bsr		initRTZ
 uu:
-	clr.w		TASK_WhileValue
+	;clr.w		TASK_WhileValue
 	rts
 
 ;-----------------------------------------------
