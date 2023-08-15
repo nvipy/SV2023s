@@ -480,7 +480,10 @@ playCloseRTZ:
 
 	rts
 .next:
-	moveq		#0,d0
+	lea		$ffff8900.w,a0 ; cut sample
+	clr.b		1(a0)
+
+	moveq		#40,d0
 	bsr		AUD_setVolume
 	bsr		playRTZ
 	TASK_NEXT
