@@ -807,10 +807,13 @@ initSound:
 
     moveq      #7,d0
     move.w     d0,(a0)
-    move.b     (a0),4(a2)         ; sndRegSav
+    move.b     (a0),sndRegSav(a2)
+	move.w	   #40000,chanAFreq(a2)
+	clr.w	   noteCnter(a2)
 
-    move.w     d0,(a2)
-    clr.w      2(a2)           ; framecnt
+
+    move.w     d0,noise(a2)
+    clr.w      framecnt(a2)
 
     clr.b      (a0)            ; channel A freq low
     move.b     #%1000000,(a1)     ; freq low
@@ -836,6 +839,46 @@ initSound:
 
     rts
 
+DELAY_BETWEEN_NOTES1 = 2
+DELAY_BETWEEN_NOTES2 = 8
+CHORD_START			 = 20
+
+updateSound_End:
+        lea        soundvars,a2
+	    lea        $ffff8800,a0
+	    lea        2(a0),a1
+
+        move.w     framecnt(a2),d2
+        addq.w     #1,d2
+        move.w     d2,framecnt(a2)
+		cmp.w	   #
+
+		move.w	   chanAFreq(a2),d0
+		and.w	   #4095,d0				; notes wrapping		
+		move.w	   noteCnter(a2),d1
+		bne.b	   notnewnote
+		add.w	   #256,d0
+		move.w	   #DELAY_BETWEEN_NOTES1,d1
+notnewnote:
+	    subq.w	   #1,d1
+		move.w	   d1,noteCnter(a2)
+		move.w	   d0,chanAFreq(a2)
+		sub.w	   #10000,d0		; base note
+		neg.w	   d0
+		clr.b      (a0)            	  ; channel A freq low
+		move.b     d0,(a1) 			  ; freq low
+		move.b     #1,(a0)            ; channel A freq hi
+		lsr.w	   #8,d0
+		move.b     d0,(a1)    		  ; freq hi
+
+        move.b     #8,(a0)            ; channel A volume
+        move.b     #12,(a1)
+
+        move.b     #7,(a0) 
+        move.b     #%111110,(a1)      ; turn on channel A 
+
+        rts
+
 SNDFADEOUT = 140
 
 updateSound:
@@ -845,9 +888,9 @@ updateSound:
 		moveq		#12,d3
 
         ; RAMP UP VOLUME
-        move.w     2(a2),d2
+        move.w     framecnt(a2),d2
         addq.w     #1,d2
-        move.w     d2,2(a2)
+        move.w     d2,framecnt(a2)
 		cmp.w	   #SNDFADEOUT,d2 ; fade out
 		bge.b	   fadeout
         lsr.w      #4,d2
@@ -872,9 +915,9 @@ noclampvol:
         move.b     #8,(a0)            ; channel A volume
         move.b     d2,(a1)
 
-        move.w     (a2),d0
+        move.w     noise(a2),d0
         addq.w     #1,d0
-        move.w     d0,(a2)
+        move.w     d0,noise(a2)
         and.w      #31,d0
         move.w     #%110110,d1         ; channel A + noise
         cmp.w      #8,d0
@@ -1211,10 +1254,16 @@ textEnd:		even
 ;---------------------------------------------------------
                 section bss
                 even
-soundvars:
-noise     ds.w       1
-framecnt  ds.w       1
-sndRegSav ds.w       1 
+
+sndStruct
+noise     rs.w       1
+framecnt  rs.w       1
+sndRegSav rs.w       1 
+chanAFreq rs.w       1 
+noteCnter rs.w       1 
+sndStruct_len rs.w	 1
+
+soundvars: ds.b       sndStruct_len
 
 textImg:		ds.b	2048*8
 
