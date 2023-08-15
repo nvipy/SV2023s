@@ -1,7 +1,8 @@
 DELAY_BETWEEN_NOTES1 = 8
 NOTES_TONE_INTERVAL = 128
 CHORD_START			 = 20
-SNDFADEOUT 			= 250
+SNDFADEOUT 			= 300
+STOP_NOISE			= 32*8
 
 initSound:
     ; init sound
@@ -63,6 +64,7 @@ updateSound:
 
         ; RAMP UP VOLUME
         move.w     framecnt(a2),d2
+		move.w	   d2,d7
         addq.w     #1,d2
         move.w     d2,framecnt(a2)
 		cmp.w	   #SNDFADEOUT,d2 ; fade out
@@ -74,9 +76,6 @@ updateSound:
         move.w     d3,d2
 		bra.s	   noclampvol
 fadeout:
-	;	move.b     #6,(a0)            ; NOISE
-	;	move.b     d2,(a1)
-
 		sub.w		#SNDFADEOUT,d2
 		lsr.w		#2,d2
 		sub.w		d3,d2
@@ -94,10 +93,13 @@ noclampvol:
         move.w     d0,noise(a2)
         and.w      #31,d0
         move.w     #%110110,d1         ; channel A + noise
+		cmp.w	   #STOP_NOISE,d7
+		bge.b		.nonoise
         cmp.w      #8,d0
         ble.b      .donoise
+.nonoise:
         move.b     #%111110,d1       ; clear noise
-.donoise
+.donoise:
         move.b     #7,(a0)            ; access Yamaha register 7
         move.b     d1,(a1)            ; turn on channel A
 
@@ -113,9 +115,8 @@ END_initSound:
     clr.b      (a1)
     move.b     #10,(a0)            ; channel C volume
     clr.b      (a1)
-
-
 	rts
+
 
 END_updateSound:
 	lea        soundvars,a2
@@ -148,14 +149,14 @@ endregwrap:
 	move.w	   d2,d3
 	lsr.w	   #1,d3			  ; 0, 1 or 2
 	addq.w	   #8,d3			  ; 8, 9 or 10
+    move.b     d3,(a0)            ; select channel volume
+    move.b     #12,(a1)
 	move.b     d2,(a0)            ; select channel - LOW
 	move.b     d0,(a1) 			  ; freq low
 	addq.w	   #1,d2
 	move.b     d2,(a0)            ; select channel - HI
 	lsr.w	   #8,d0
 	move.b     d0,(a1)    		  ; freq hi
-    move.b     d3,(a0)            ; select channel volume
-    move.b     #12,(a1)
 notnewnote:
 	subq.w	   #1,d1
 	move.w	   d1,noteCnter(a2)
@@ -182,4 +183,5 @@ chanAFreq rs.w       1
 noteCnter rs.w       1
 prevNoteChan rs.w	 1 
 sndStruct_len rs.w	 1
+
 
