@@ -1307,6 +1307,10 @@ STD_initPlot:		; A0 = rows, A1 = wxs, D0 = rowcount-1, D1 = width, D2 = row over
 ;
 ;**********************************************************************
 
+AUD_SHIFT		=	250	; +xxx = R before L, -xxx L before R , 125 = 1/100 sec 
+AUD_TREBLE		=	7	; [0..12], normal 6, here treble +1
+AUD_BASS		=	5	; [0..12], normal 6, here bass -1
+
 ;------------------------------------------------------------------------------
 ; create Diff.Indice table
 MakeAdpcm:
@@ -1415,8 +1419,15 @@ AUDIO_DIFFS_SIZE		=	DiffsEnd-Diffs
 AUDIO_DIFF_INDICES_SIZE		=	(AUDIO_DIFFS_SIZE*16)*4	; use only for init, can use scrath memory
 AUDIO_DBL_DIFF_INDICES_SIZE	=	(AUDIO_DIFFS_SIZE*256)*4
 
-AUD_SHR_CHN	=	1
-AUD_SHL_CHN	=	0
+		IFGE			AUD_SHIFT
+AUD_SHR_CHN			=	1
+AUD_SHL_CHN			=	0
+AUD_ABS_SHIFT			=	AUD_SHIFT
+		ELSE
+AUD_SHR_CHN			=	0
+AUD_SHL_CHN			=	1
+AUD_ABS_SHIFT_ABS		=	-AUD_SHIFT
+		ENDC
 
 ;-----------------------------------------------
 decodeMono:
@@ -1472,9 +1483,9 @@ endSamplePtr:	dc.l		0
 ;-----------------------------------------------
 makeStereo:
 		move.l		endSamplePtr,a5
-		lea		-256*2(a5),a0
+		lea		-AUD_ABS_SHIFT*2(a5),a0
 		lea		sample,a1
-		move.w		#256/4-1,d7
+		move.w		#AUD_ABS_SHIFT/4-1,d7
 .topstereo
 		movep.l		AUD_SHR_CHN(a0),d0
 		movep.l		d0,AUD_SHL_CHN(a1)
@@ -1486,7 +1497,7 @@ makeStereo:
 
 		move.l		music+8,d7
 		lsr.l		#2,d7
-		sub.w		#256/4+1,d7
+		;sub.w		#AUD_ABS_SHIFT/2+1,d7	; #AUD_ABS_SHIFT/4+1,d7 ??? FIXED, BUT NEED TO DEBUG !!!!!!!!!!!
 
 .remstereo
 		movep.l		AUD_SHR_CHN(a0),d0
@@ -1563,10 +1574,16 @@ AUD_play:
 		move.w		#%10100010100,(a1)		; right channel volume
 .3:		cmp.w		(a2),d0
 		bne.s		.3
+		move.w		#%10010000000+AUD_TREBLE,(a1)	; treble
+.4:		cmp.w		(a2),d0
+		bne.s		.4
+		move.w		#%10001000000+AUD_BASS,(a1)	; base
+.5:		cmp.w		(a2),d0
+		bne.s		.5
 
 		move.l		#sample,d0
 		;move.l		endSamplePtr,d1
-		moveq		#-64,d1
+		moveq		#-4,d1
 		and.l		endSamplePtr,d1
 
 		movep.w		d0,5(a0)
@@ -1655,7 +1672,7 @@ cos:			ds.b	1024*4
 buffers:		ds.b	WSCREEN_BYTES*(HSCREEN*2+64)
 texture:		ds.b	65536*8
 sample:			ds.b	MUSIC_LENGTH*8
-endsample:	
+endsample:
 			ds.b	16384
 ;sin:
 END_Wxs:		ds.l	WSCREEN*3
