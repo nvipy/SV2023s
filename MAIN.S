@@ -1415,6 +1415,9 @@ AUDIO_DIFFS_SIZE		=	DiffsEnd-Diffs
 AUDIO_DIFF_INDICES_SIZE		=	(AUDIO_DIFFS_SIZE*16)*4	; use only for init, can use scrath memory
 AUDIO_DBL_DIFF_INDICES_SIZE	=	(AUDIO_DIFFS_SIZE*256)*4
 
+AUD_SHR_CHN	=	1
+AUD_SHL_CHN	=	0
+
 ;-----------------------------------------------
 decodeMono:
 		lea		music+8,a4
@@ -1443,8 +1446,8 @@ u		set		0
 		ext.w		d1
 		add.w		d1,d3
 		asr.w		#1,d3
-		move.b		d3,u(a5)		; 8					S1
-		move.b		d6,u+2(a5)	; 8  ; store value			S2
+		move.b		d3,AUD_SHR_CHN+u(a5)		; 8					S1
+		move.b		d6,AUD_SHR_CHN+u+2(a5)	; 8  ; store value			S2
 
 		swap		d7
 
@@ -1453,8 +1456,8 @@ u		set		0
 		ext.w		d3
 		add.w		d3,d1
 		asr.w		#1,d1
-		move.b		d1,u+4(a5)	; 8					S1
-		move.b		d6,u+6(a5)	; 8  ; store value			S2
+		move.b		d1,AUD_SHR_CHN+u+4(a5)	; 8					S1
+		move.b		d6,AUD_SHR_CHN+u+6(a5)	; 8  ; store value			S2
 
 u		set		u+8
 		endr
@@ -1473,8 +1476,8 @@ makeStereo:
 		lea		sample,a1
 		move.w		#256/4-1,d7
 .topstereo
-		movep.l		0(a0),d0
-		movep.l		d0,1(a1)
+		movep.l		AUD_SHR_CHN(a0),d0
+		movep.l		d0,AUD_SHL_CHN(a1)
 		addq.l		#8,a0
 		addq.l		#8,a1
 		dbra		d7,.topstereo
@@ -1486,10 +1489,10 @@ makeStereo:
 		sub.w		#256/4+1,d7
 
 .remstereo
-		movep.l		0(a0),d0
-		movep.l		d0,1(a1)
-		movep.l		8+0(a0),d0
-		movep.l		d0,8+1(a1)
+		movep.l		AUD_SHR_CHN(a0),d0
+		movep.l		d0,AUD_SHL_CHN(a1)
+		movep.l		AUD_SHR_CHN+8(a0),d0
+		movep.l		d0,AUD_SHL_CHN+8(a1)
 		lea		16(a0),a0
 		lea		16(a1),a1
 		dbra		d7,.remstereo
@@ -1562,7 +1565,9 @@ AUD_play:
 		bne.s		.3
 
 		move.l		#sample,d0
-		move.l		endSamplePtr,d1
+		;move.l		endSamplePtr,d1
+		moveq		#-64,d1
+		and.l		endSamplePtr,d1
 
 		movep.w		d0,5(a0)
 		swap		d0
