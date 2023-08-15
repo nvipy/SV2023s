@@ -1,7 +1,7 @@
 DELAY_BETWEEN_NOTES1 = 8
 NOTES_TONE_INTERVAL = 128
 CHORD_START			 = 20
-SNDFADEOUT 			= 300
+SNDFADEOUT 			= 290
 STOP_NOISE			= 32*8
 
 initSound:
@@ -119,6 +119,10 @@ END_initSound:
 
 
 END_updateSound:
+	moveq		#40,d0
+	bsr		AUD_setVolume
+	clr.b		$ffff8901.w	; AUD STOP
+
 	lea        soundvars,a2
 	lea        $ffff8800,a0
 	lea        2(a0),a1
@@ -151,6 +155,7 @@ endregwrap:
 	addq.w	   #8,d3			  ; 8, 9 or 10
     move.b     d3,(a0)            ; select channel volume
     move.b     #12,(a1)
+	
 	move.b     d2,(a0)            ; select channel - LOW
 	move.b     d0,(a1) 			  ; freq low
 	addq.w	   #1,d2
