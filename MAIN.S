@@ -1339,7 +1339,7 @@ updateSound_End:
         move.w     framecnt(a2),d2
         addq.w     #1,d2
         move.w     d2,framecnt(a2)
-		cmp.w	   #
+;		cmp.w	   #
 
 		move.w	   chanAFreq(a2),d0
 		and.w	   #4095,d0				; notes wrapping		
@@ -1709,12 +1709,13 @@ musicend:
 MUSIC_LENGTH	=	musicend-music
 
 text:			dc.b	""
-			dc.b	"LADY MACBETH They met me in the day of success: and I have "
-			dc.b	"learned by the perfectest report, they have more in "
-			dc.b	"them than mortal knowledge. When I burned in desire "
-			dc.b	"to question them further, they made themselves air, "
-			dc.b	"into which they vanished. Whiles I stood rapt in "
-			dc.b	"the wonder of it, came missives from the king, who "
+			dc.b	"                                                             "
+			dc.b	"NGC salutes the Atari community with this little compo filler. "
+			dc.b	"Code and GFX by Viper - Original music by Jester of Sanity "
+			dc.b	"(tortured to elevator jazz by Soundy). "
+			dc.b	"Greets to: Leonard, MajorX, Gadget, Dan, Dascon, Virgill, "
+			dc.b	"Facet, Erk, Made, Prowler, NoRecess, Merry, Platon42, Rez, Ok3nos, "
+			dc.b	"ntsc_, "
 			dc.b	"all-hailed me 'Thane of Cawdor' by which title, "
 			dc.b	"before, these weird sisters saluted me, and referred "
 			dc.b	"me to the coming on of time, with 'Hail, king that "
