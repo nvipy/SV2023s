@@ -109,16 +109,25 @@ SeqWaitIntro:
 		TASK_MAKE	playCloseRTZ,RTZ_vbl,TASK_MAX_DURATION,0
 
 		TASK_MAKE	END_iter,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	END_fade,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	END_play,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	END_initLogo,NULL,TASK_MAX_DURATION,0
-		TASK_MAKE	END_playLogo,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	END_fade,NULL,TASK_MAX_DURATION,0
 
 		TASK_MAKE	endLoop,LOGO_initSound,TASK_MAX_DURATION,0
-SeqWaitEnd:
 		TASK_MAKE	END_setLightLogo,LOGO_updateSound,TASK_MAX_DURATION,0
-		TASK_MAKE	END_playLogo,LOGO_updateSound,TASK_MAX_DURATION,0
-		TASK_MAKE	END_setDarkLogo,LOGO_updateSound,TASK_MAX_DURATION,0
-		TASK_MAKE	END_playLogo,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_fade,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_setDarkLogoBlue,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_fade,LOGO_updateSound,TASK_MAX_DURATION,0
+SeqWaitEnd:
+		TASK_MAKE	END_setLightLogoRed,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_fade,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_setDarkLogoRed,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_fade,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_setLightLogoBlue,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_fade,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_setDarkLogoBlue,LOGO_updateSound,TASK_MAX_DURATION,0
+		TASK_MAKE	END_fade,LOGO_updateSound,TASK_MAX_DURATION,0
 
 		TASK_MAKE	TASK_while,LOGO_updateSound,TASK_MAX_DURATION,0
 
@@ -371,6 +380,8 @@ initRTZ:
 	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YClr
 	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YScroll
 
+	bsr		createPosRTZ
+
 	move.w		#INTRO_ITER_COUNT-1,d7
 .iter:
 ;	addq.w		#1,$ffff8240.w
@@ -381,9 +392,45 @@ initRTZ:
 .enditer	
 ;	BGC		$f00
 
-
 	rts
 
+;---------------------------------------------------------
+createPosRTZ:
+	lea		sin,a0
+	lea		cos,a1
+	lea		PosRTZ,a2
+	moveq		#0,d0
+	moveq		#0,d1
+	move.w		#4096-1,d7
+.posloop:
+	and.l		#$07fe07fe,d0
+	and.l		#$07fe,d1
+	move.w		(a0,d0.w),d5
+	move.w		(a0,d0.w),d6
+	swap		d0
+	;add.w		(a0,d0.w),d5
+	;add.w		(a0,d0.w),d6
+
+	add.w		(a0,d0.w),d2
+	asr.w		#1,d2
+	add.w		d2,d5
+	add.w		(a0,d0.w),d2
+	asr.w		#1,d2
+	add.w		d2,d6
+
+	add.w		(a0,d1.w),d5
+	add.w		(a0,d1.w),d6
+	lsl.w		#1,d5
+	lsl.w		#1,d6
+	movem.w		d5/d6,(a2)
+	add.l		#$a0006,d0
+	addq.w		#2,d1
+	addq.l		#2,a2
+	dbra		d7,.posloop
+	move.l		#PosRTZ,PosRTZPtr
+	rts
+
+PosRTZPtr:	dc.l	0
 
 ;---------------------------------------------------------
 playAudio:
@@ -432,7 +479,7 @@ playRTZ:
 	move.w		2(a0,d0.w),d1
 	add.w		#4*3,zoomOfs
 	asr.w		#5,d1		; -1024,1024
-	add.w		#1280,d1
+	add.w		#1024,d1
 	move.w		d1,d2
 	add.w		#256,d1
 	lsr.w		#2,d2
@@ -517,7 +564,7 @@ RTZ_vbl
 	lea		textImg,a0
 
 	add.w		YScroll,a3
-	lea		160+6(a3),a3
+	lea		160(a3),a3
 
 	moveq		#2,d0
 	swap		d0
@@ -533,6 +580,8 @@ RTZ_vbl
 
 	move.w		sftInc(pc,d2.w),d0
 	move.w		sftInc+2(pc,d2.w),d1
+
+;	movem.w		sftInc(pc,d2.w),d0-d1		; ???
 
 	lea		$ffff8a20.w,a2			; First register needed
 	moveq		#-1,d2				; msk
@@ -801,18 +850,29 @@ DrawRTZ2:
 	add.w		RasterizeScrOfs,a4
 	add.w		#(20-wordCount)*4,a4
 	lea		160(a4),a5
-;	moveq.		#rowCount-1,d3
 	move.w		RasterizeMod,a5
+
 	move.w		rzHeight,d3
 	bpl.s		.draw
 	rts
 .draw:
+
+	move.l		PosRTZPtr,a0
 	moveq		#0,d5
-	move.w		xyCenter,d5
-	lsl.l		#8,d5
-	swap		d5
-	move.b		d5,d6
-	move.w		xyCenter+2,d5
+	move.w		(a0)+,d5	; 00.00.Hx.Lx
+	lsl.l		#8,d5		; 00.Hx.Lx.00
+	swap		d5		; Lx.00.00.Hx
+	move.b		d5,d6		; Hx
+	move.w		(a0)+,d5	; Lx.00.Hy.Ly
+	move.l		a0,PosRTZPtr
+
+;	moveq		#0,d5
+;	move.w		xyCenter,d5
+;	lsl.l		#8,d5
+;	swap		d5
+;	move.b		d5,d6
+;	move.w		xyCenter+2,d5
+
 	move.l		#65536*2,d4
 
 .drtzloop2
@@ -863,8 +923,8 @@ Rasterize2:
 	rts
 
 ;-----------------------------------------------
-alpha:		dc.w	2048+512
-zoomOfs:	dc.w	0
+alpha:		dc.w	256+512; 2048+512
+zoomOfs:	dc.w	1024+256
 xyZoom:		dc.w	256,64
 xyCenter:	dc.w	0,0
 rzTopOfs:	dc.w	0
@@ -919,7 +979,7 @@ END_initLogo:
 	rts
 
 ;-----------------------------------------------
-END_playLogo:
+END_fade:
 	lea		$ffff8240.w,a4
 	bsr		ShadePal		; a4 = dest,  Return d0: d0=0 continue, d0=-1 end
 	tst.w		d0
@@ -932,25 +992,47 @@ END_playLogo:
 END_setLightLogo:
 	moveq		#2,d0
 	lea		cmapLogo,a0
-	lea		cmaplightLogo,a1
+	lea		cmaplightLogoBlue,a1
 	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
 	TASK_NEXT
 	rts
 
 ;-----------------------------------------------
-END_setDarkLogo:
+END_setLightLogoBlue:
 	moveq		#2,d0
-	lea		cmaplightLogo,a0
-	lea		cmapLogo,a1
+	lea		cmapDarkLogo,a0
+	lea		cmaplightLogoBlue,a1
+	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
+	TASK_NEXT
+	rts
+
+END_setLightLogoRed:
+	moveq		#2,d0
+	lea		cmapDarkLogo,a0
+	lea		cmaplightLogoRed,a1
+	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
+	TASK_NEXT
+	rts
+
+;-----------------------------------------------
+END_setDarkLogoBlue:
+	moveq		#2,d0
+	lea		cmaplightLogoBlue,a0
+	lea		cmapDarkLogo,a1
 	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
 	TASK_NEXT
 	rts
 	
+END_setDarkLogoRed:
+	moveq		#2,d0
+	lea		cmaplightLogoRed,a0
+	lea		cmapDarkLogo,a1
+	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
+	TASK_NEXT
+	rts
+
 
 ;-----------------------------------------------
-cmapBaseLogo:	dc.w	0,0,0,0,0,$fff,$fff,$fff
-cmapLogo:	dc.w	0,$222,$444,$666,$888,$aaa,$ccc,$eee
-cmaplightLogo:	dc.w	$002,$77a,$99b,$bbc,$ccd,$dde,$eef,$fff
 
 
 ;-----------------------------------------------
@@ -983,8 +1065,14 @@ END_iter:
 
 
 	WAIT_VBL
-	lea		cmapRTZ,a0
-	bsr		SetColors
+;	lea		cmapRTZ,a0
+;	bsr		SetColors
+
+	moveq		#0,d0
+	lea		cmapBlack,a0
+	;lea		cmapRTZ,a1
+	lea		cmapPoints,a1
+	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
 
 	bsr		END_initSound
 	TASK_NEXT
@@ -1004,18 +1092,17 @@ END_init:
 	move.w		#WSCREEN,d3
 	moveq		#$2,d5
 	bsr		STD_initPlot	; A0 = rows, A1 = wxs, D0 = rowcount-1, D1 = width, D2 = row overflow, D3 = width overflow, D5 = ganularity between horz words
-
 	bsr		END_initPlay
-
 	bsr		END_initIterDot
+
 
 	rts
 
 ;-----------------------------------------------
 END_initPlay:
-	lea		END_Frames,a0
+	lea		END_Frames+40*HSCREEN,a0
 	lea		END_FramePtrs,a1
-	moveq		#END_FRAME_COUNT-1-1,d7
+	moveq		#END_FRAME_COUNT-1-2,d7
 .frmloop:
 	move.l		a0,(a1)+
 	lea		40*HSCREEN(a0),a0
@@ -1298,16 +1385,12 @@ STD_initPlot:		; A0 = rows, A1 = wxs, D0 = rowcount-1, D1 = width, D2 = row over
 	dbra		d3,.wordloop
 	rts
 
-
-
-
 ;**********************************************************************
 ;
 ;		AUDIO
 ;
 ;**********************************************************************
-
-AUD_SHIFT		=	250	; +xxx = R before L, -xxx L before R , 125 = 1/100 sec 
+AUD_SHIFT		=	250	; +xxx = R before L, -xxx L before R , 125 = 1/100 sec
 AUD_TREBLE		=	7	; [0..12], normal 6, here treble +1
 AUD_BASS		=	5	; [0..12], normal 6, here bass -1
 
@@ -1600,10 +1683,20 @@ AUD_play:
 ;-----------------------------------------------
                 section data
 
-cmapRTZ:	dc.w	0,$111,$222,$333,$444,$555,$666,$777,$888,$999,$aaa,$bbb,$ccc,$ddd,$eee,$fff
-cmapBlack:	dc.w	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-cmapWhite:	dc.w	$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff
-cmapLigth:	dc.w	$300,$410,$520,$630,$740,$852,$974,$a96,$aa8,$bb9,$cca,$eeb,$ffc,$ffd,$ffe,$fff
+                ;	0    8    4    12    2    10   6    14   1    9    5    13    3    11   7    15
+                ;	0000 1000 0100 1100 0010 1010 0110 1110 0001 1001 0101 1101 0011 1011 0111 1111
+cmapRTZ:		dc.w	$000,$888,$444,$ccc,$222,$aaa,$666,$eee,$111,$999,$555,$ddd,$333,$bbb,$777,$fff
+cmapPoints:		dc.w	$000,$411,$422,$433,$444,$555,$666,$777,$888,$999,$aab,$bbd,$ccf,$ddf,$eef,$fff
+cmapBlack:		dc.w	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+cmapWhite:		dc.w	$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff
+cmapLigth:		dc.w	$300,$410,$520,$630,$740,$852,$974,$a96,$aa8,$bb9,$cca,$eeb,$ffc,$ffd,$ffe,$fff
+
+cmapBaseLogo:		dc.w	0,0,0,0,0,$fff,$fff,$fff
+cmapLogo:		dc.w	0,$222,$444,$666,$888,$aaa,$ccc,$eee
+cmapDarkLogo:		dc.w	0,$111,$222,$333,$444,$555,$666,$777
+cmaplightLogoBlue:	dc.w	$001,$75a,$98b,$bac,$ccd,$dde,$eef,$fff
+cmaplightLogoRed:	dc.w	$100,$a57,$b89,$cab,$dcc,$edd,$fee,$fff
+
 
 END_Logo:	incbin	"data/ngc.img"
 title		incbin	"data/title.img"
@@ -1617,36 +1710,18 @@ MUSIC_LENGTH	=	musicend-music
 
 text:			dc.b	""
 			dc.b	"                                                             "
+			dc.b	"NGC 2023 - IHNTTOFAN (I Have No Time To Find A Name) ... "
 			dc.b	"NGC salutes the Atari community with this little compo filler. "
 			dc.b	"Code and GFX by Viper - Original music by Jester of Sanity "
 			dc.b	"(tortured to elevator jazz by Soundy). "
 			dc.b	"Greets to: Leonard, MajorX, Gadget, Dan, Dascon, Virgill, "
 			dc.b	"Facet, Erk, Made, Prowler, NoRecess, Merry, Platon42, Rez, Ok3nos, "
-			dc.b	"ntsc_, hugs go to TRSI, we'll miss Spotter"
+			dc.b	"ntsc_, hugs go to TRSI, we'll miss Spotter."
+			dc.b	""
 			dc.b	"all-hailed me 'Thane of Cawdor' by which title, "
 			dc.b	"before, these weird sisters saluted me, and referred "
-			dc.b	"me to the coming on of time, with 'Hail, king that "
-			dc.b	"shalt be!' This have I thought good to deliver "
-			dc.b	"thee, my dearest partner of greatness, that thou "
-			dc.b	"mightst not lose the dues of rejoicing, by being "
-			dc.b	"ignorant of what greatness is promised thee. Lay it "
-			dc.b	"to thy heart, and farewell. "
-			dc.b	"Glamis thou art, and Cawdor; and shalt be "
-			dc.b	"What thou art promised: yet do I fear thy nature; "
-			dc.b	"It is too full o' the milk of human kindness "
-			dc.b	"To catch the nearest way:  thou wouldst be great; "
-			dc.b	"Art not without ambition, but without "
-			dc.b	"The illness should attend it: what thou wouldst highly, "
-			dc.b	"That wouldst thou holily; wouldst not play false, "
-			dc.b	"And yet wouldst wrongly win: thou'ldst have, great Glamis, "
-			dc.b	"That which cries 'Thus thou must do, if thou have it; "
-			dc.b	"And that which rather thou dost fear to do "
-			dc.b	"Than wishest should be undone.' Hie thee hither, "
-			dc.b	"That I may pour my spirits in thine ear; "
-			dc.b	"And chastise with the valour of my tongue "
-			dc.b	"All that impedes thee from the golden round, "
-			dc.b	"Which fate and metaphysical aid doth seem "
-			dc.b	"To have thee crown'd withal. "
+			dc.b	"me to the coming on of time"
+			dc.b	"                                                             "
 textEnd:		even
 
 ;---------------------------------------------------------
@@ -1669,6 +1744,8 @@ DblDiffIndices:		ds.b	AUDIO_DBL_DIFF_INDICES_SIZE
 sin:			ds.b	1024*2
 cos:			ds.b	1024*4
 			ds.b	2*50*120
+PosRTZ:			ds.l	4096
+
 buffers:		ds.b	WSCREEN_BYTES*(HSCREEN*2+64)
 texture:		ds.b	65536*8
 sample:			ds.b	MUSIC_LENGTH*8
