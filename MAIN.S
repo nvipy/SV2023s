@@ -1711,16 +1711,13 @@ MUSIC_LENGTH	=	musicend-music
 text:			dc.b	""
 			dc.b	"                                                             "
 			dc.b	"NGC 2023 - IHNTTOFAN (I Have No Time To Find A Name) ... "
-			dc.b	"NGC salutes the Atari community with this little compo filler. "
+			dc.b	"We salute the Atari community with this little compo filler "
+			dc.b	"made for the Silly Venture Summer Edition 2023 - "
 			dc.b	"Code and GFX by Viper - Original music by Jester of Sanity "
 			dc.b	"(tortured to elevator jazz by Soundy). "
 			dc.b	"Greets to: Leonard, MajorX, Gadget, Dan, Dascon, Virgill, "
 			dc.b	"Facet, Erk, Made, Prowler, NoRecess, Merry, Platon42, Rez, Ok3nos, "
 			dc.b	"ntsc_, hugs go to TRSI, we'll miss Spotter."
-			dc.b	""
-			dc.b	"all-hailed me 'Thane of Cawdor' by which title, "
-			dc.b	"before, these weird sisters saluted me, and referred "
-			dc.b	"me to the coming on of time"
 			dc.b	"                                                             "
 textEnd:		even
 

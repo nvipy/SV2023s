@@ -1,3 +1,6 @@
+; The AY-3-8910 offers three sound channels, which may be set to produce a square wave, a noise signal, or both at once. Square waves are configured much like the SN76489, and with the Atari’s 2Mhz clock, the formula for a target frequency is V=125,000/f. This results in a 12-bit value that goes into a pair of registers (0-1 for channel A, 2-3 for B, and 4-5 for C.)
+; To play Middle C (261.5 Hz) at full volume, we would first divide it into 125,000 for a register value of 478 (01DE hex). We set the frequency by writing $DE to register 0, $01 to register 1
+
 DELAY_BETWEEN_NOTES = 8
 NOTES_TONE_INTERVAL = 160; 128
 CHORD_START			 = 20
