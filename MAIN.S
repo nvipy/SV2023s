@@ -40,8 +40,9 @@ mainloop:
 	WAIT_VBL
 	TASK_CALL	_TASK_Main		; Task call macro, /1: _TASK_Main or _TASK_Vbl, return -1 if seq finished
 
-	cmp.b		#$39,$fffc02
-	bne.s		mainloop
+	;cmp.b		#$39,$fffc02
+	;bne.s		mainloop
+	bra.s		mainloop
 
 	bsr		AUD_stop
 	bsr		ResetVbl
@@ -73,7 +74,7 @@ Vbl:
 ;-----------------------------------------------
 Sequence:
 		TASK_MAKE	initTitle,NULL,TASK_MAX_DURATION,0
-		;TASK_MAKE	initRTZ,initfader01,TASK_MAX_DURATION,0
+		;TASK_MAKE	RTZ_init,initfader01,TASK_MAX_DURATION,0
 		TASK_MAKE	initAll,initfader01,TASK_MAX_DURATION,0
 
 		TASK_MAKE	NULL,fader,TASK_MAX_DURATION,0
@@ -99,14 +100,21 @@ SeqWaitIntro:
 		TASK_MAKE	deadTime,initfader20,TASK_MAX_DURATION,0
 		TASK_MAKE	deadTime,fader,TASK_MAX_DURATION,0
 
-		TASK_MAKE	initRTZScreen,NULL,TASK_MAX_DURATION,0
+		TASK_MAKE	RTZ_initScreen,NULL,TASK_MAX_DURATION,0
 
 		TASK_MAKE	deadTime,NULL,50,0
 
-		TASK_MAKE	deadTime,playAudio,TASK_MAX_DURATION,0
-		TASK_MAKE	playOpenRTZ,RTZ_vbl,TASK_MAX_DURATION,0
-		TASK_MAKE	playRTZ,RTZ_vbl,25*100,0
-		TASK_MAKE	playCloseRTZ,RTZ_vbl,TASK_MAX_DURATION,0
+		TASK_MAKE	deadTime,RTZ_playAudio,TASK_MAX_DURATION,0
+		TASK_MAKE	RTZ_playOpen,RTZ_vbl,TASK_MAX_DURATION,0
+		TASK_MAKE	RTZ_play,RTZ_vbl,37*25,0
+		TASK_MAKE	RTZ_playInitFadeMauve,RTZ_vbl,TASK_MAX_DURATION,0
+		TASK_MAKE	RTZ_playFade,RTZ_vbl,TASK_MAX_DURATION,0
+		TASK_MAKE	RTZ_play,RTZ_vbl,37*25,0
+		TASK_MAKE	RTZ_playInitFadeSepia,RTZ_vbl,TASK_MAX_DURATION,0
+		TASK_MAKE	RTZ_playFade,RTZ_vbl,TASK_MAX_DURATION,0
+		TASK_MAKE	RTZ_play,RTZ_vbl,37*25,0
+
+		TASK_MAKE	RTZ_playClose,RTZ_vbl,TASK_MAX_DURATION,0
 
 		TASK_MAKE	END_iter,NULL,TASK_MAX_DURATION,0
 		TASK_MAKE	END_fade,NULL,TASK_MAX_DURATION,0
@@ -187,7 +195,7 @@ TASK_WhileValue:	dc.w	0
 ;-----------------------------------------------
 initAll:
 	bsr		END_init
-	bsr		initRTZ
+	bsr		RTZ_init
 uu:
 	;clr.w		TASK_WhileValue
 	rts
@@ -336,7 +344,7 @@ fader:
 	rts
 
 ;---------------------------------------------------------
-faderCmap:	dc.l	0		; selected cmapRTZ 
+faderCmap:	dc.l	0		; selected RTZ_cmapGrey 
 faderInc:	dc.l	0		
 faderCounter:	dc.w	0		
 cmapPtrs:	ds.l	4	
@@ -348,7 +356,7 @@ cmapPtrs:	ds.l	4
 ;**********************************************************************
 
 ;---------------------------------------------------------
-initRTZ:
+RTZ_init:
 	lea		sin,a0
 	moveq		#10,d0
 	move.l		#$8000,d1
@@ -358,7 +366,7 @@ initRTZ:
 	bsr		decodeMono
 	bsr		makeStereo
 
-	bsr		initRTZ3
+	bsr		RTZ_create
 
 	move.w		#160*96,rzTopOfs
 	clr.w		rzHeight
@@ -380,7 +388,7 @@ initRTZ:
 	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YClr
 	move.w		#(HSCREEN-9)*WSCREEN_BYTES,YScroll
 
-	bsr		createPosRTZ
+	bsr		RTZ_createPos
 
 	move.w		#INTRO_ITER_COUNT-1,d7
 .iter:
@@ -395,10 +403,10 @@ initRTZ:
 	rts
 
 ;---------------------------------------------------------
-createPosRTZ:
+RTZ_createPos:
 	lea		sin,a0
 	lea		cos,a1
-	lea		PosRTZ,a2
+	lea		RTZ_Pos,a2
 	moveq		#0,d0
 	moveq		#0,d1
 	move.w		#4096-1,d7
@@ -427,13 +435,13 @@ createPosRTZ:
 	addq.w		#2,d1
 	addq.l		#2,a2
 	dbra		d7,.posloop
-	move.l		#PosRTZ,PosRTZPtr
+	move.l		#RTZ_Pos,RTZ_PosPtr
 	rts
 
-PosRTZPtr:	dc.l	0
+RTZ_PosPtr:	dc.l	0
 
 ;---------------------------------------------------------
-playAudio:
+RTZ_playAudio:
 	bsr		AUD_play
 	moveq		#40,d0
 	bsr		AUD_setVolume
@@ -442,10 +450,10 @@ playAudio:
 	rts
 
 ;---------------------------------------------------------
-initRTZScreen:
+RTZ_initScreen:
 	bsr		EXIT_sound
 	bsr		ClearAllScreenSTEBuffer
-	lea		cmapRTZ,a0
+	lea		RTZ_cmapGrey,a0
 	bsr		SetColors	; a0 = palette ptr  
 
 	moveq		#40,d0
@@ -457,21 +465,54 @@ initRTZScreen:
 	rts
 
 ;-----------------------------------------------
-playOpenRTZ:
+RTZ_playOpen:
 	move.w		rzTopOfs,d0
 	sub.w		#160*2,d0
 	bmi.s		.next
 	move.w		d0,rzTopOfs
 	add.w		#2,rzHeight
-	bsr.s		playRTZ
+	bsr.s		RTZ_play
 	rts
 .next:
 	TASK_NEXT
 	rts	
 
 ;---------------------------------------------------------
-playRTZ:
-	BGC		$000
+RTZ_playInitFadeMauve:
+	moveq		#1,d0
+	lea		RTZ_cmapGrey,a0
+	lea		RTZ_cmapMauve,a1
+	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
+	bsr		RTZ_play
+	TASK_NEXT
+	rts
+
+;---------------------------------------------------------
+RTZ_playInitFadeSepia:
+	moveq		#1,d0
+	lea		RTZ_cmapMauve,a0
+	lea		RTZ_cmapSepia,a1
+	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
+	bsr		RTZ_play
+	TASK_NEXT
+	rts
+
+;---------------------------------------------------------
+RTZ_playFade:
+	lea		$ffff8240.w,a4
+	bsr		ShadePal		; a4 = dest,  Return d0: d0=0 continue, d0=-1 end
+	tst.w		d0
+	bne.s		.next
+	bsr		RTZ_play
+	rts
+.next
+	bsr		RTZ_play
+	TASK_NEXT
+	rts
+	
+;---------------------------------------------------------
+RTZ_play:
+;	BGC		$000
 
 	move.w		zoomOfs,d0
 	and.w		#4095,d0
@@ -488,9 +529,9 @@ playRTZ:
 
 	subq.l		#2,backBuf
 
-	bsr		PrepareRTZ
+	bsr		RTZ_Prepare
 
-	bsr		DrawRTZ2
+	bsr		RTZ_draw
 	addq.w		#4,alpha
 	and.w		#$ffc,alpha
 
@@ -506,15 +547,15 @@ playRTZ:
 
 	bsr		SwapSTEBuffers
 
-	;BGC		$0f0
+;	BGC		$0f0
 	bsr		END_calcIterDot
-	;BGC		$000
+;	BGC		$000
 
 	rts
 
 
 ;-----------------------------------------------
-playCloseRTZ:
+RTZ_playClose:
 	bsr		AUD_fadeVol
 
 	sub.w		#1,rzHeight
@@ -526,16 +567,16 @@ playCloseRTZ:
 	add.w		#9*WSCREEN_BYTES,d0
 	beq.s		.next
 
-	bsr		playRTZ
+	bsr		RTZ_play
 
 	rts
 .next:
 	lea		$ffff8900.w,a0 ; cut sample
 	clr.b		1(a0)
 
-	moveq		#40,d0
-	bsr		AUD_setVolume
-	bsr		playRTZ
+;	moveq		#40,d0
+;	bsr		AUD_setVolume
+	bsr		RTZ_play
 	TASK_NEXT
 	rts	
 
@@ -546,15 +587,17 @@ YClr:			dc.w	0
 YScroll:		dc.w	0
 
 ;-----------------------------------------------
-RTZ_vbl
+RTZ_vbl:
 	move.l		frontBuf,a1
 	move.l		a1,a3
 	add.w		YClr,a1
+	moveq		#-1,d4
+
 
 	lea		$ffff8a28.w,a2			; First register needed
-	moveq		#-1,d0
-	move.l		d0,(a2)+
-	move.w		d0,(a2)+
+	;moveq		#-1,d0
+	move.l		d4,(a2)+
+	move.w		d4,(a2)+
 	moveq		#2,d0				; DstXinc.DstYinc
 	move.l		d0,(a2)+			; DstXinc.DstYinc
 	move.l		a1,(a2)+			; DstPtr
@@ -562,16 +605,22 @@ RTZ_vbl
 	move.l		#$0000c000,(a2)			; Hop 
 
 	lea		textImg,a0
+	move.l		a0,a1
 
 	add.w		YScroll,a3
 	lea		160(a3),a3
+	lea		162(a3),a4
 
 	moveq		#2,d0
 	swap		d0
 	move.l		#$02030000,d1
+	move.l		#$00080008,d5
+	move.l		#$00140008,d6
 
-	move.w		txtpos,d2
-	move.w		d2,d0
+	move.w		txtpos,d0
+	move.l		d0,d3
+	addq.w		#4,d0
+	move.w		d0,d2
 	and.w		#$3c,d2
 	lsr.w		#6,d0
 	add.w		d0,d0
@@ -584,15 +633,37 @@ RTZ_vbl
 ;	movem.w		sftInc(pc,d2.w),d0-d1		; ???
 
 	lea		$ffff8a20.w,a2			; First register needed
-	moveq		#-1,d2				; msk
+	;moveq		#-1,d2				; msk
 	move.l		d0,(a2)+			; SrcXinc.SrcYinc
 	move.l		a0,(a2)+			; SrcPtr
-	move.l		d2,(a2)+			; Fmsk.Mmsk
-	move.w		d2,(a2)+			; Lmsk
-	move.l		#$00080008,(a2)+		; DstXinc.DstYinc
+	move.l		d4,(a2)+			; Fmsk.Mmsk
+	move.w		d4,(a2)+			; Lmsk
+	move.l		d5,(a2)+			; DstXinc.DstYinc
 	move.l		a3,(a2)+			; DstPtr
-	move.l		#$00140008,(a2)+		; Width.Height
+	move.l		d6,(a2)+			; Width.Height
 	move.l		d1,(a2)				; Hop 
+
+	move.l		d3,d0
+	and.w		#$3c,d0
+	lsr.w		#6,d3
+	add.w		d3,d3
+	add.w		d3,a1
+
+	move.w		sftInc(pc,d0.w),d3
+	move.w		sftInc+2(pc,d0.w),d1
+
+	lea		$ffff8a20.w,a2			; First register needed
+	;moveq		#-1,d2				; msk
+	move.l		d3,(a2)+			; SrcXinc.SrcYinc
+	move.l		a1,(a2)+			; SrcPtr
+	move.l		d4,(a2)+			; Fmsk.Mmsk
+	move.w		d4,(a2)+			; Lmsk
+	move.l		d5,(a2)+			; DstXinc.DstYinc
+	move.l		a4,(a2)+			; DstPtr
+	move.l		d6,(a2)+			; Width.Height
+	move.l		d1,(a2)				; Hop 
+
+
 	rts
 
 txtpos:		dc.w	0
@@ -604,7 +675,7 @@ wt 	= 	128;128
 ht 	= 	64;16
 
 ;---------------------------------------------------------
-initRTZ3:
+RTZ_create:
 	lea	rzimg,a0
 	lea	texture,a2
 	move.l	#65536*2,d0
@@ -717,7 +788,7 @@ wordCount	=	20
 colCount	=	wordCount*8
 
 ;-----------------------------------------------------------------
-SetRaster2:
+RTZ_SetRaster:
 TEXEL2	macro
 		move.w	d5,d7	; iHy.iLy
 		move.b	d6,d7	; iHy.iHx
@@ -735,7 +806,7 @@ TEXEL2	macro
 	moveq	#0,d6
 	move.w	#$7ffc,d0
 
-	lea	Rasterize2+2,a6
+	lea	RTZ_rasterize+2,a6
 .rloop2
 	TEXEL2
 	move.w	d7,(a6)
@@ -767,7 +838,7 @@ TEXEL2	macro
 	rts
 
 ;-----------------------------------------------
-PrepareRTZ:
+RTZ_Prepare:
 	lea	LxHLy(pc),a1
 	move.w	alpha(pc),d0
 	lea	cos,a0
@@ -834,12 +905,12 @@ PrepareRTZ:
 	rts
 
 ;-----------------------------------------------
-DrawRTZ2:
+RTZ_draw:
 	lea		LxHLy(pc),a1
 	move.b		8(a1),d2	; ??.??.??.Hx
 	move.l		(a1),d1		; LxHLy
 
-	bsr		SetRaster2
+	bsr		RTZ_SetRaster
 
 	move.b		9(a1),d2	; ??.??.??.Hx
 	move.l		4(a1),d1	; LxHLy
@@ -857,14 +928,14 @@ DrawRTZ2:
 	rts
 .draw:
 
-	move.l		PosRTZPtr,a0
+	move.l		RTZ_PosPtr,a0
 	moveq		#0,d5
 	move.w		(a0)+,d5	; 00.00.Hx.Lx
 	lsl.l		#8,d5		; 00.Hx.Lx.00
 	swap		d5		; Lx.00.00.Hx
 	move.b		d5,d6		; Hx
 	move.w		(a0)+,d5	; Lx.00.Hy.Ly
-	move.l		a0,PosRTZPtr
+	move.l		a0,RTZ_PosPtr
 
 ;	moveq		#0,d5
 ;	move.w		xyCenter,d5
@@ -887,7 +958,7 @@ DrawRTZ2:
 	lea		(a0,d4.l),a1
 	lea		(a1,d4.l),a2
 	lea		(a2,d4.l),a3
-	bsr.s		Rasterize2
+	bsr.s		RTZ_rasterize
 	add.w		a5,a4
 
 	dbra		d3,.drtzloop2
@@ -907,7 +978,7 @@ DrawRTZ2:
 	rts
 
 ;-----------------------------------------------------------------
-Rasterize2:
+RTZ_rasterize:
 	rept	wordCount
 		move.w	$1000(a0),d0
 		or.w	$1002(a0),d0
@@ -1065,12 +1136,12 @@ END_iter:
 
 
 	WAIT_VBL
-;	lea		cmapRTZ,a0
+;	lea		RTZ_cmapGrey,a0
 ;	bsr		SetColors
 
 	moveq		#0,d0
 	lea		cmapBlack,a0
-	;lea		cmapRTZ,a1
+	;lea		RTZ_cmapGrey,a1
 	lea		cmapPoints,a1
 	bsr		InitPalShading		; d0:speed, a0:srcpal, a1:destpal
 
@@ -1392,7 +1463,7 @@ STD_initPlot:		; A0 = rows, A1 = wxs, D0 = rowcount-1, D1 = width, D2 = row over
 ;**********************************************************************
 AUD_SHIFT		=	250	; +xxx = R before L, -xxx L before R , 125 = 1/100 sec
 AUD_TREBLE		=	7	; [0..12], normal 6, here treble +1
-AUD_BASS		=	5	; [0..12], normal 6, here bass -1
+AUD_BASS		=	8	; [0..12], normal 6, here bass -1
 
 ;------------------------------------------------------------------------------
 ; create Diff.Indice table
@@ -1683,9 +1754,11 @@ AUD_play:
 ;-----------------------------------------------
                 section data
 
-                ;	0    8    4    12    2    10   6    14   1    9    5    13    3    11   7    15
-                ;	0000 1000 0100 1100 0010 1010 0110 1110 0001 1001 0101 1101 0011 1011 0111 1111
-cmapRTZ:		dc.w	$000,$888,$444,$ccc,$222,$aaa,$666,$eee,$111,$999,$555,$ddd,$333,$bbb,$777,$fff
+                ;		0    8    4    12    2    10   6    14   1    9    5    13    3    11   7    15
+                ;		0000 1000 0100 1100 0010 1010 0110 1110 0001 1001 0101 1101 0011 1011 0111 1111
+RTZ_cmapGrey:		dc.w	$000,$888,$444,$ccc,$222,$aaa,$666,$eee,$111,$999,$555,$ddd,$333,$bbb,$777,$fff
+RTZ_cmapSepia:		dc.w	$000,$986,$542,$dca,$320,$ba8,$652,$fec,$210,$a97,$653,$edb,$431,$cb9,$875,$ffe
+RTZ_cmapMauve:		dc.w	$000,$869,$425,$cad,$203,$a8b,$526,$ecf,$102,$97a,$536,$dbe,$314,$b9c,$758,$fef
 cmapPoints:		dc.w	$000,$411,$422,$433,$444,$555,$666,$777,$888,$999,$aab,$bbd,$ccf,$ddf,$eef,$fff
 cmapBlack:		dc.w	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 cmapWhite:		dc.w	$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff,$fff
@@ -1710,14 +1783,16 @@ MUSIC_LENGTH	=	musicend-music
 
 text:			dc.b	""
 			dc.b	"                                                             "
-			dc.b	"NGC 2023 - IHNTTOFAN (I Have No Time To Find A Name) ... "
-			dc.b	"We salute the Atari community with this little compo filler "
-			dc.b	"made for the Silly Venture Summer Edition 2023 - "
-			dc.b	"Code and GFX by Viper - Original music by Jester of Sanity "
-			dc.b	"(tortured to elevator jazz by Soundy). "
-			dc.b	"Greets to: Leonard, MajorX, Gadget, Dan, Dascon, Virgill, "
+			dc.b	"NGC salutes the Atari community with this little compo filler. "
+			dc.b	"made for the Silly Venture Summer Edition 2023.  "
+			dc.b	"Code and GFX by Vipy - Original music by Jester/Sanity "
+			dc.b	"(tortured to elevator jazz by Soundy).  "
+			dc.b	"Greets to: SV staff, Leonard, MajorX, Gadget, Dan, Dascon, Virgill, "
 			dc.b	"Facet, Erk, Made, Prowler, NoRecess, Merry, Platon42, Rez, Ok3nos, "
-			dc.b	"ntsc_, hugs go to TRSI, we'll miss Spotter."
+			dc.b	"ntsc_, hugs go to TRSI, we'll miss Spotter.  "
+			dc.b	"This shortro was produced in 2 weeks, around an old code never released"
+			dc.b	" ... IHNTTFAN (I Have No Time To Find A Name) ..."
+			dc.b	"                                                             "
 			dc.b	"                                                             "
 textEnd:		even
 
@@ -1741,7 +1816,7 @@ DblDiffIndices:		ds.b	AUDIO_DBL_DIFF_INDICES_SIZE
 sin:			ds.b	1024*2
 cos:			ds.b	1024*4
 			ds.b	2*50*120
-PosRTZ:			ds.l	4096
+RTZ_Pos:			ds.l	4096
 
 buffers:		ds.b	WSCREEN_BYTES*(HSCREEN*2+64)
 texture:		ds.b	65536*8
